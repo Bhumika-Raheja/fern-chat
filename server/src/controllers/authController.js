@@ -76,3 +76,16 @@ export async function login(req, res, next) {
         next(err);
     }
 }
+
+export async function me(req, res) {
+    const user = req.user;
+    res.json({
+        user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            avatarUrl: user.avatarUrl,
+            statusMessage: user.statusMessage,
+        },
+    });
+}
