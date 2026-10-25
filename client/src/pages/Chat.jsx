@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { useConversationStore } from "../store/conversationStore";
+import { connectSocket, disconnectSocket } from "../socket/socket";
 import Sidebar from "../components/Sidebar";
 import ChatArea from "../components/ChatArea";
 
@@ -21,6 +22,7 @@ export default function Chat() {
             .then((res) => {
                 setSession(token, res.data.user);
                 fetchConversations();
+                connectSocket(token);
             })
             .catch(() => {
                 logout();
@@ -29,6 +31,7 @@ export default function Chat() {
     }, []);
 
     function handleLogout() {
+        disconnectSocket();
         logout();
         navigate("/login");
     }
