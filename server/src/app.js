@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env.js";
+import authRoutes from "./routes/authRoutes.js";
 
 const app = express();
 
@@ -18,6 +19,8 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.use("/api/auth", authRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 
