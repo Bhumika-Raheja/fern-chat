@@ -7,6 +7,7 @@ import MessageInput from "./MessageInput";
 export default function ChatArea({ conversation }) {
     const user = useAuthStore((s) => s.user);
     const fetchMessages = useMessageStore((s) => s.fetchMessages);
+    const loadOlder = useMessageStore((s) => s.loadOlder);
     const sendMessage = useMessageStore((s) => s.sendMessage);
     const state = useMessageStore((s) => s.byConversation[conversation._id]);
 
@@ -31,8 +32,11 @@ export default function ChatArea({ conversation }) {
             <MessageList
                 messages={state?.messages || []}
                 loading={state?.loading}
+                loadingOlder={state?.loadingOlder}
+                hasMore={!!state?.nextCursor}
                 error={state?.error}
                 myId={user?.id}
+                onLoadOlder={() => loadOlder(conversation._id)}
             />
 
             <MessageInput
