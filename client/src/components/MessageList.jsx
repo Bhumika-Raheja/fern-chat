@@ -12,6 +12,7 @@ export default function MessageList({
     error,
     myId,
     onLoadOlder,
+    onRetry,
 }) {
     const boxRef = useRef(null);
     const atBottom = useRef(true);
@@ -82,7 +83,15 @@ export default function MessageList({
                                 {formatTime(m.createdAt)}
                                 {m.status === "pending" && " · Sending..."}
                                 {m.status === "failed" && (
-                                    <span className="text-danger"> · Failed to send</span>
+                                    <span className="text-danger">
+                                        {" · Failed to send. "}
+                                        <button
+                                            onClick={() => onRetry(m.clientId)}
+                                            className="font-medium underline"
+                                        >
+                                            Retry
+                                        </button>
+                                    </span>
                                 )}
                             </p>
                         </div>

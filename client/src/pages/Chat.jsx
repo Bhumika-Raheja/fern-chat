@@ -9,6 +9,12 @@ import Sidebar from "../components/Sidebar";
 import ChatArea from "../components/ChatArea";
 import ConnectionBanner from "../components/ConnectionBanner";
 
+// Runs every time the socket connects (the first time and after each reconnect)
+function onSocketConnect() {
+    useConversationStore.getState().fetchConversations();
+    useMessageStore.getState().syncAfterReconnect();
+}
+
 export default function Chat() {
     const navigate = useNavigate();
     const { token, setSession, logout } = useAuthStore();
@@ -25,8 +31,12 @@ export default function Chat() {
                 setSession(token, res.data.user);
                 fetchConversations();
                 const socket = connectSocket(token);
-                socket.off("message:new"); // avoids double listeners
+
+                // remove old listeners first, so none is ever registered twice
+                socket.off("message:new");
+                socket.off("connect", onSocketConnect);
                 socket.on("message:new", (m) => useMessageStore.getState().receiveMessage(m));
+                socket.on("connect", onSocketConnect);
             })
             .catch(() => {
                 logout();

@@ -21,6 +21,66 @@ function patch(set, id, change) {
     }));
 }
 
+// Change the status of one message that is not saved yet
+function setStatus(set, conversationId, clientId, status) {
+    patch(set, conversationId, (c) => ({
+        ...c,
+        messages: c.messages.map((m) =>
+            m.clientId === clientId && m.status !== "sent" ? { ...m, status } : m
+        ),
+    }));
+}
+
+// Send one message through the socket. If we are offline, it simply stays
+// "pending" and is sent again when the connection comes back.
+function deliver(get, set, conversationId, message) {
+    const socket = getSocket();
+    if (!socket || !socket.connected) return;
+
+    socket.timeout(8000).emit(
+        "message:send",
+        { conversationId, body: message.body, clientId: message.clientId },
+        (err, res) => {
+            if (err || !res?.ok) {
+                setStatus(set, conversationId, message.clientId, "failed");
+                return;
+            }
+            get().receiveMessage(res.message);
+        }
+    );
+}
+
+// The _id of the newest message that is saved on the server
+function lastSavedId(messages) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].status === "sent") return messages[i]._id;
+    }
+    return null;
+}
+
+// Fetch whatever this conversation missed while we were offline
+async function syncOne(get, conversationId) {
+    const c = get().byConversation[conversationId];
+    if (!c || !c.loaded) return; // never opened: it will load fresh when opened
+
+    try {
+        let after = lastSavedId(c.messages);
+        for (let round = 0; round < 10; round++) {
+            const params = after ? { after, limit: 100 } : { limit: 30 };
+            const res = await api.get(`/api/conversations/${conversationId}/messages`, { params });
+
+            // "after" answers oldest first, the normal list answers newest first
+            const list = after ? res.data.messages : [...res.data.messages].reverse();
+            list.forEach((m) => get().receiveMessage(m));
+
+            if (!after || !res.data.hasMoreNewer || list.length === 0) break;
+            after = list[list.length - 1]._id;
+        }
+    } catch {
+        // ignore: the next reconnect will try again
+    }
+}
+
 export const useMessageStore = create((set, get) => ({
     byConversation: {},
 
@@ -79,7 +139,7 @@ export const useMessageStore = create((set, get) => ({
             // Already have this exact message? Ignore it.
             if (c.messages.some((m) => m._id === message._id)) return c;
 
-            // Is it my own pending message coming back? Replace it.
+            // Is it my own unsent message coming back? Replace it.
             const index = c.messages.findIndex(
                 (m) => m.clientId && m.clientId === message.clientId
             );
@@ -94,13 +154,14 @@ export const useMessageStore = create((set, get) => ({
         });
     },
 
-    sendMessage: async (conversationId, body, user) => {
+    sendMessage: (conversationId, body, user) => {
         const clientId = crypto.randomUUID();
 
-        // 1. Show the message immediately as "pending"
+        // Show the message immediately as "pending"
         const pending = {
             _id: clientId,
             clientId,
+            conversationId,
             body,
             createdAt: new Date().toISOString(),
             senderId: { _id: user.id, name: user.name },
@@ -108,31 +169,35 @@ export const useMessageStore = create((set, get) => ({
         };
         patch(set, conversationId, (c) => ({ ...c, messages: [...c.messages, pending] }));
 
-        const markFailed = () =>
-            patch(set, conversationId, (c) => ({
-                ...c,
-                messages: c.messages.map((m) =>
-                    m.clientId === clientId && m.status === "pending" ? { ...m, status: "failed" } : m
-                ),
-            }));
+        deliver(get, set, conversationId, pending);
+    },
 
-        // 2. Send through the socket and wait for the server's answer
-        const socket = getSocket();
-        if (!socket || !socket.connected) {
-            markFailed();
-            return;
-        }
+    // The "Retry" button on a failed message
+    retryMessage: (conversationId, clientId) => {
+        const c = get().byConversation[conversationId];
+        const message = c?.messages.find((m) => m.clientId === clientId && m.status === "failed");
+        if (!message) return;
 
-        socket.timeout(8000).emit(
-            "message:send",
-            { conversationId, body, clientId },
-            (err, res) => {
-                if (err || !res?.ok) {
-                    markFailed();
-                    return;
-                }
-                get().receiveMessage(res.message);
-            }
-        );
+        setStatus(set, conversationId, clientId, "pending");
+        deliver(get, set, conversationId, message);
+    },
+
+    // Send again everything that never got confirmed
+    resendUnsent: () => {
+        const all = get().byConversation;
+        Object.entries(all).forEach(([conversationId, c]) => {
+            const unsent = c.messages.filter((m) => m.status === "pending" || m.status === "failed");
+            unsent.forEach((m) => {
+                setStatus(set, conversationId, m.clientId, "pending");
+                deliver(get, set, conversationId, m);
+            });
+        });
+    },
+
+    // Called every time the socket connects
+    syncAfterReconnect: async () => {
+        const ids = Object.keys(get().byConversation);
+        await Promise.all(ids.map((id) => syncOne(get, id)));
+        get().resendUnsent();
     },
 }));

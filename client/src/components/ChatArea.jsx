@@ -9,6 +9,7 @@ export default function ChatArea({ conversation }) {
     const fetchMessages = useMessageStore((s) => s.fetchMessages);
     const loadOlder = useMessageStore((s) => s.loadOlder);
     const sendMessage = useMessageStore((s) => s.sendMessage);
+    const retryMessage = useMessageStore((s) => s.retryMessage);
     const state = useMessageStore((s) => s.byConversation[conversation._id]);
 
     useEffect(() => {
@@ -37,6 +38,7 @@ export default function ChatArea({ conversation }) {
                 error={state?.error}
                 myId={user?.id}
                 onLoadOlder={() => loadOlder(conversation._id)}
+                onRetry={(clientId) => retryMessage(conversation._id, clientId)}
             />
 
             <MessageInput
