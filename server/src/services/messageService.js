@@ -32,7 +32,20 @@ export async function createMessage({ conversationId, senderId, body, clientId }
     }
 }
 
-export async function listMessages({ conversationId, before, limit }) {
+export async function listMessages({ conversationId, before, after, limit }) {
+    // Catching up: messages newer than "after", oldest first
+    if (after && mongoose.isValidObjectId(after)) {
+        const found = await Message.find({ conversationId, _id: { $gt: after } })
+            .sort({ _id: 1 })
+            .limit(limit + 1)
+            .populate("senderId", "name avatarUrl");
+
+        const hasMoreNewer = found.length > limit;
+        const messages = hasMoreNewer ? found.slice(0, limit) : found;
+        return { messages, nextCursor: null, hasMoreNewer };
+    }
+
+    // Scrolling up: messages older than "before", newest first
     const query = { conversationId };
     if (before && mongoose.isValidObjectId(before)) {
         query._id = { $lt: before };

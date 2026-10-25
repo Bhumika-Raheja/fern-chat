@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { useConversationStore } from "../store/conversationStore";
+import { useMessageStore } from "../store/messageStore";
 import { connectSocket, disconnectSocket } from "../socket/socket";
 import Sidebar from "../components/Sidebar";
 import ChatArea from "../components/ChatArea";
-import { useMessageStore } from "../store/messageStore";
+import ConnectionBanner from "../components/ConnectionBanner";
 
 export default function Chat() {
     const navigate = useNavigate();
@@ -44,14 +45,17 @@ export default function Chat() {
     return (
         <div className="flex h-screen">
             <Sidebar onLogout={handleLogout} />
-            <main className="flex flex-1 bg-cream">
-                {active ? (
-                    <ChatArea key={active._id} conversation={active} />
-                ) : (
-                    <div className="flex flex-1 items-center justify-center">
-                        <p className="text-muted">Select a conversation</p>
-                    </div>
-                )}
+            <main className="flex min-w-0 flex-1 flex-col bg-cream">
+                <ConnectionBanner />
+                <div className="flex min-h-0 flex-1">
+                    {active ? (
+                        <ChatArea key={active._id} conversation={active} />
+                    ) : (
+                        <div className="flex flex-1 items-center justify-center">
+                            <p className="text-muted">Select a conversation</p>
+                        </div>
+                    )}
+                </div>
             </main>
         </div>
     );

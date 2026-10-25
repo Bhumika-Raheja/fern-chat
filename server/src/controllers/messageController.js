@@ -44,13 +44,14 @@ export async function getMessages(req, res, next) {
         }
 
         const limit = Math.min(Math.max(parseInt(req.query.limit) || 30, 1), 100);
-        const { messages, nextCursor } = await listMessages({
+        const { messages, nextCursor, hasMoreNewer } = await listMessages({
             conversationId: conversation._id,
             before: req.query.before,
+            after: req.query.after,
             limit,
         });
 
-        res.json({ messages, nextCursor });
+        res.json({ messages, nextCursor, hasMoreNewer: !!hasMoreNewer });
     } catch (err) {
         next(err);
     }
