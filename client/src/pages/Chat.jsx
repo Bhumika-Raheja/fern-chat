@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { useConversationStore } from "../store/conversationStore";
 import Sidebar from "../components/Sidebar";
+import ChatArea from "../components/ChatArea";
 
 export default function Chat() {
     const navigate = useNavigate();
@@ -37,16 +38,13 @@ export default function Chat() {
     return (
         <div className="flex h-screen">
             <Sidebar onLogout={handleLogout} />
-            <main className="flex flex-1 items-center justify-center bg-cream">
+            <main className="flex flex-1 bg-cream">
                 {active ? (
-                    <div className="text-center">
-                        <h1 className="text-2xl font-semibold">
-                            {active.type === "channel" ? `# ${active.name}` : active.name || "Direct message"}
-                        </h1>
-                        <p className="text-muted">{active.memberIds.length} members. Messages coming next.</p>
-                    </div>
+                    <ChatArea key={active._id} conversation={active} />
                 ) : (
-                    <p className="text-muted">Select a conversation</p>
+                    <div className="flex flex-1 items-center justify-center">
+                        <p className="text-muted">Select a conversation</p>
+                    </div>
                 )}
             </main>
         </div>
