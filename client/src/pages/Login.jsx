@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import FernLogo from "../components/FernLogo";
@@ -73,6 +73,12 @@ export default function Login() {
                 >
                     {loading ? "Signing in..." : "Sign in"}
                 </button>
+                <p className="mt-4 text-center text-sm text-muted">
+                    New to Fern?{" "}
+                    <Link to="/signup" className="font-medium text-primary">
+                        Create an account
+                    </Link>
+                </p>
             </form>
         </div>
     );
