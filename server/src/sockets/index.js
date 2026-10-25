@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Conversation from "../models/Conversation.js";
 import { env } from "../config/env.js";
+import { registerMessageHandlers } from "./handlers/message.js";
 
 export function initSockets(httpServer) {
     const io = new Server(httpServer, {
@@ -29,16 +30,19 @@ export function initSockets(httpServer) {
     io.on("connection", async (socket) => {
         const userId = String(socket.user._id);
 
+        // Register listeners first, so no early event is missed
+        registerMessageHandlers(io, socket);
+
+        socket.on("disconnect", (reason) => {
+            console.log(`Socket disconnected: ${socket.user.name} (${reason})`);
+        });
+
         // A personal room, plus one room per conversation I belong to
         socket.join(`user:${userId}`);
         const conversations = await Conversation.find({ memberIds: userId }).select("_id");
         conversations.forEach((c) => socket.join(`conversation:${c._id}`));
 
         console.log(`Socket connected: ${socket.user.name} (${conversations.length} rooms)`);
-
-        socket.on("disconnect", (reason) => {
-            console.log(`Socket disconnected: ${socket.user.name} (${reason})`);
-        });
     });
 
     return io;

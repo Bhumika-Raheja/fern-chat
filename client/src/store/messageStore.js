@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api } from "../api/client";
+import { getSocket } from "../socket/socket";
 
 const empty = { messages: [], nextCursor: null, loading: false, loaded: false, error: "" };
 
@@ -41,6 +42,27 @@ export const useMessageStore = create((set, get) => ({
         }
     },
 
+    // A message arrived from the server (from me or from someone else)
+    receiveMessage: (message) => {
+        patch(set, message.conversationId, (c) => {
+            // Already have this exact message? Ignore it.
+            if (c.messages.some((m) => m._id === message._id)) return c;
+
+            // Is it my own pending message coming back? Replace it.
+            const index = c.messages.findIndex(
+                (m) => m.clientId && m.clientId === message.clientId
+            );
+            const final = { ...message, status: "sent" };
+            if (index >= 0) {
+                const copy = [...c.messages];
+                copy[index] = final;
+                return { ...c, messages: copy };
+            }
+
+            return { ...c, messages: [...c.messages, final] };
+        });
+    },
+
     sendMessage: async (conversationId, body, user) => {
         const clientId = crypto.randomUUID();
 
@@ -55,27 +77,31 @@ export const useMessageStore = create((set, get) => ({
         };
         patch(set, conversationId, (c) => ({ ...c, messages: [...c.messages, pending] }));
 
-        // 2. Save it on the server, then mark it "sent" (or "failed")
-        try {
-            const res = await api.post(`/api/conversations/${conversationId}/messages`, {
-                body,
-                clientId,
-            });
+        const markFailed = () =>
             patch(set, conversationId, (c) => ({
                 ...c,
                 messages: c.messages.map((m) =>
-                    m.clientId === clientId
-                        ? { ...res.data.message, senderId: m.senderId, status: "sent" }
-                        : m
+                    m.clientId === clientId && m.status === "pending" ? { ...m, status: "failed" } : m
                 ),
             }));
-        } catch {
-            patch(set, conversationId, (c) => ({
-                ...c,
-                messages: c.messages.map((m) =>
-                    m.clientId === clientId ? { ...m, status: "failed" } : m
-                ),
-            }));
+
+        // 2. Send through the socket and wait for the server's answer
+        const socket = getSocket();
+        if (!socket || !socket.connected) {
+            markFailed();
+            return;
         }
+
+        socket.timeout(8000).emit(
+            "message:send",
+            { conversationId, body, clientId },
+            (err, res) => {
+                if (err || !res?.ok) {
+                    markFailed();
+                    return;
+                }
+                get().receiveMessage(res.message);
+            }
+        );
     },
 }));

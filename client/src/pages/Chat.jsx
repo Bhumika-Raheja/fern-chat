@@ -6,6 +6,7 @@ import { useConversationStore } from "../store/conversationStore";
 import { connectSocket, disconnectSocket } from "../socket/socket";
 import Sidebar from "../components/Sidebar";
 import ChatArea from "../components/ChatArea";
+import { useMessageStore } from "../store/messageStore";
 
 export default function Chat() {
     const navigate = useNavigate();
@@ -22,7 +23,9 @@ export default function Chat() {
             .then((res) => {
                 setSession(token, res.data.user);
                 fetchConversations();
-                connectSocket(token);
+                const socket = connectSocket(token);
+                socket.off("message:new"); // avoids double listeners
+                socket.on("message:new", (m) => useMessageStore.getState().receiveMessage(m));
             })
             .catch(() => {
                 logout();
