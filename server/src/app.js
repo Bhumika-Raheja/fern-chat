@@ -4,6 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env.js";
 import authRoutes from "./routes/authRoutes.js";
+import conversationRoutes from "./routes/conversationRoutes.js";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/conversations", conversationRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
 
