@@ -1,0 +1,14 @@
+:root {
+    --fern-primary: #5e6f45;
+    --fern-sage-soft: #8a9a6b;
+    --fern-bg: #f7f2eb;
+    --fern-sidebar: #e9e1d6;
+    --fern-received: #eeeeee;
+    --fern-text: #2b2a26;
+    --fern-muted: #8a857b;
+    --fern-border: #ddd5c8;
+    --fern-online: #22c55e;
+    --fern-offline: #b8b2a7;
+    --fern-danger: #d9534f;
+    --fern-accent: #c77d4e;
+}

@@ -1,0 +1,25 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+
+@theme inline {
+  --color-primary: var(--fern-primary);
+  --color-sage: var(--fern-sage-soft);
+  --color-cream: var(--fern-bg);
+  --color-sidebar: var(--fern-sidebar);
+  --color-received: var(--fern-received);
+  --color-ink: var(--fern-text);
+  --color-muted: var(--fern-muted);
+  --color-line: var(--fern-border);
+  --color-online: var(--fern-online);
+  --color-offline: var(--fern-offline);
+  --color-danger: var(--fern-danger);
+  --color-accent: var(--fern-accent);
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: var(--fern-bg);
+  color: var(--fern-text);
+  font-family: var(--font-sans);
+}
