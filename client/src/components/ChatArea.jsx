@@ -1,11 +1,13 @@
 import { useEffect } from "react";
 import { useAuthStore } from "../store/authStore";
 import { useMessageStore } from "../store/messageStore";
+import { usePresenceStore } from "../store/presenceStore";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 
 export default function ChatArea({ conversation }) {
     const user = useAuthStore((s) => s.user);
+    const online = usePresenceStore((s) => s.online);
     const fetchMessages = useMessageStore((s) => s.fetchMessages);
     const loadOlder = useMessageStore((s) => s.loadOlder);
     const sendMessage = useMessageStore((s) => s.sendMessage);
@@ -23,11 +25,19 @@ export default function ChatArea({ conversation }) {
         title = other ? other.name : "Direct message";
     }
 
+    const onlineCount = conversation.memberIds.filter((m) => online[m._id]).length;
+
     return (
         <div className="flex h-full flex-1 flex-col">
             <header className="flex items-center gap-3 border-b border-line px-6 py-3">
                 <h1 className="text-lg font-semibold">{title}</h1>
                 <span className="text-sm text-muted">{conversation.memberIds.length} members</span>
+                {conversation.type !== "dm" && (
+                    <span className="flex items-center gap-1.5 text-sm text-muted">
+                        <span className="h-2 w-2 rounded-full bg-online" />
+                        {onlineCount} online
+                    </span>
+                )}
             </header>
 
             <MessageList

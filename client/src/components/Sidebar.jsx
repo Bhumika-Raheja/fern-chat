@@ -1,6 +1,7 @@
 import FernLogo from "./FernLogo";
 import { useConversationStore } from "../store/conversationStore";
 import { useAuthStore } from "../store/authStore";
+import { usePresenceStore } from "../store/presenceStore";
 
 function Section({ title, items, activeId, onSelect, renderName }) {
     return (
@@ -29,15 +30,25 @@ export default function Sidebar({ onLogout }) {
     const { conversations, activeId, setActive, loading, error } =
         useConversationStore();
     const user = useAuthStore((s) => s.user);
+    const online = usePresenceStore((s) => s.online);
 
     const channels = conversations.filter((c) => c.type === "channel");
     const groups = conversations.filter((c) => c.type === "group");
     const dms = conversations.filter((c) => c.type === "dm");
 
-    // For a DM, show the other person's name
+    // For a DM: a presence dot and the other person's name
     function dmName(c) {
         const other = c.memberIds.find((m) => m._id !== user?.id);
-        return other ? other.name : "Direct message";
+        const isOnline = other && online[other._id];
+        return (
+            <span className="flex items-center gap-2">
+                <span
+                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${isOnline ? "bg-online" : "bg-offline"
+                        }`}
+                />
+                {other ? other.name : "Direct message"}
+            </span>
+        );
     }
 
     return (

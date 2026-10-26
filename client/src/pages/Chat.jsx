@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useAuthStore } from "../store/authStore";
 import { useConversationStore } from "../store/conversationStore";
 import { useMessageStore } from "../store/messageStore";
+import { usePresenceStore } from "../store/presenceStore";
 import { connectSocket, disconnectSocket } from "../socket/socket";
 import Sidebar from "../components/Sidebar";
 import ChatArea from "../components/ChatArea";
@@ -34,8 +35,15 @@ export default function Chat() {
 
                 // remove old listeners first, so none is ever registered twice
                 socket.off("message:new");
+                socket.off("presence:list");
+                socket.off("presence:update");
                 socket.off("connect", onSocketConnect);
+
                 socket.on("message:new", (m) => useMessageStore.getState().receiveMessage(m));
+                socket.on("presence:list", (ids) => usePresenceStore.getState().setList(ids));
+                socket.on("presence:update", (p) =>
+                    usePresenceStore.getState().setOne(p.userId, p.online)
+                );
                 socket.on("connect", onSocketConnect);
             })
             .catch(() => {
