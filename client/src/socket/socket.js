@@ -2,6 +2,7 @@ import { io } from "socket.io-client";
 import { useConnectionStore } from "../store/connectionStore";
 
 let socket = null;
+let goodbyeAdded = false;
 
 export function connectSocket(token) {
     if (socket) return socket; // only ever one connection
@@ -9,8 +10,16 @@ export function connectSocket(token) {
     const setStatus = useConnectionStore.getState().setStatus;
     socket = io(import.meta.env.VITE_API_URL, {
         auth: { token },
-        closeOnBeforeunload: true, // tell the server right away when the tab closes
+        closeOnBeforeunload: true,
     });
+
+    // When the tab closes or the page is left, say goodbye to the server right away
+    if (!goodbyeAdded) {
+        goodbyeAdded = true;
+        window.addEventListener("pagehide", () => {
+            if (socket) socket.disconnect();
+        });
+    }
 
     socket.on("connect", () => {
         console.log("Socket connected", socket.id);
@@ -19,7 +28,7 @@ export function connectSocket(token) {
 
     socket.on("disconnect", (reason) => {
         console.log("Socket disconnected:", reason);
-        if (reason === "io client disconnect") return; // I logged out on purpose
+        if (reason === "io client disconnect") return; // I left on purpose
         setStatus("reconnecting");
         // If the server closed the line itself, the browser does not retry by default
         if (reason === "io server disconnect") socket.connect();
