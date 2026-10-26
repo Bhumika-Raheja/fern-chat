@@ -4,6 +4,7 @@ import { useMessageStore } from "../store/messageStore";
 import { usePresenceStore } from "../store/presenceStore";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
+import TypingIndicator from "./TypingIndicator";
 
 export default function ChatArea({ conversation }) {
     const user = useAuthStore((s) => s.user);
@@ -51,8 +52,11 @@ export default function ChatArea({ conversation }) {
                 onRetry={(clientId) => retryMessage(conversation._id, clientId)}
             />
 
+            <TypingIndicator conversationId={conversation._id} />
+
             <MessageInput
                 placeholder={`Message ${title}`}
+                conversationId={conversation._id}
                 onSend={(body) => sendMessage(conversation._id, body, user)}
             />
         </div>

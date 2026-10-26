@@ -5,6 +5,7 @@ import Conversation from "../models/Conversation.js";
 import { env } from "../config/env.js";
 import { registerMessageHandlers } from "./handlers/message.js";
 import { userConnected, userDisconnected, onlineAmong } from "./presence.js";
+import { registerTypingHandlers } from "./handlers/typing.js";
 
 export function initSockets(httpServer) {
     const io = new Server(httpServer, {
@@ -36,6 +37,7 @@ export function initSockets(httpServer) {
 
         // Register listeners first, so no early event is missed
         registerMessageHandlers(io, socket);
+        registerTypingHandlers(io, socket);
 
         const becameOnline = userConnected(userId);
 

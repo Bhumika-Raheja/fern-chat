@@ -5,6 +5,7 @@ import { useAuthStore } from "../store/authStore";
 import { useConversationStore } from "../store/conversationStore";
 import { useMessageStore } from "../store/messageStore";
 import { usePresenceStore } from "../store/presenceStore";
+import { useTypingStore } from "../store/typingStore";
 import { connectSocket, disconnectSocket } from "../socket/socket";
 import Sidebar from "../components/Sidebar";
 import ChatArea from "../components/ChatArea";
@@ -37,12 +38,21 @@ export default function Chat() {
                 socket.off("message:new");
                 socket.off("presence:list");
                 socket.off("presence:update");
+                socket.off("typing");
                 socket.off("connect", onSocketConnect);
 
-                socket.on("message:new", (m) => useMessageStore.getState().receiveMessage(m));
+                socket.on("message:new", (m) => {
+                    useMessageStore.getState().receiveMessage(m);
+                    // The sender has stopped typing once their message arrives
+                    const senderId = m.senderId?._id;
+                    if (senderId) useTypingStore.getState().clearTyping(m.conversationId, senderId);
+                });
                 socket.on("presence:list", (ids) => usePresenceStore.getState().setList(ids));
                 socket.on("presence:update", (p) =>
                     usePresenceStore.getState().setOne(p.userId, p.online)
+                );
+                socket.on("typing", (t) =>
+                    useTypingStore.getState().setTyping(t.conversationId, t.userId, t.name)
                 );
                 socket.on("connect", onSocketConnect);
             })
