@@ -7,7 +7,10 @@ export function connectSocket(token) {
     if (socket) return socket; // only ever one connection
 
     const setStatus = useConnectionStore.getState().setStatus;
-    socket = io(import.meta.env.VITE_API_URL, { auth: { token } });
+    socket = io(import.meta.env.VITE_API_URL, {
+        auth: { token },
+        closeOnBeforeunload: true, // tell the server right away when the tab closes
+    });
 
     socket.on("connect", () => {
         console.log("Socket connected", socket.id);
