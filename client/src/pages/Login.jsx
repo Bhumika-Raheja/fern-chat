@@ -79,7 +79,7 @@ export default function Login() {
                     value={email}
                     onChange={setEmail}
                     error={errors.email}
-                    placeholder="you@university.edu"
+                    placeholder="you@example.com"
                     autoComplete="email"
                 />
                 <AuthField

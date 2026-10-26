@@ -4,18 +4,20 @@ const chips = ["Real-time messaging", "Channels and DMs", "Share files and ideas
 
 function Illustration() {
     return (
-        <svg viewBox="0 0 320 240" className="w-full max-w-sm" fill="none">
-            <circle cx="160" cy="130" r="95" fill="#d9e3c4" opacity="0.6" />
-            <path d="M160 215 C160 160 160 110 160 60" stroke="#8a9a6b" strokeWidth="3" strokeLinecap="round" />
-            <path d="M160 150 C120 145 100 120 105 100 C140 100 160 125 160 150Z" fill="#8a9a6b" />
-            <path d="M160 120 C200 115 222 90 216 68 C180 70 160 95 160 120Z" fill="#5e6f45" />
-            <path d="M160 90 C135 85 124 66 128 50 C150 52 160 70 160 90Z" fill="#b8c99a" />
-            <rect x="20" y="30" width="150" height="40" rx="14" fill="#5e6f45" />
-            <text x="36" y="55" fontSize="13" fill="#ffffff" fontFamily="Inter, sans-serif">
+        <svg viewBox="0 0 400 260" className="w-full max-w-md" fill="none">
+            <circle cx="200" cy="140" r="100" fill="#d9e3c4" opacity="0.6" />
+            <path d="M200 225 C200 170 200 120 200 70" stroke="#8a9a6b" strokeWidth="3" strokeLinecap="round" />
+            <path d="M200 160 C160 155 140 130 145 110 C180 110 200 135 200 160Z" fill="#8a9a6b" />
+            <path d="M200 130 C240 125 262 100 256 78 C220 80 200 105 200 130Z" fill="#5e6f45" />
+            <path d="M200 100 C175 95 164 76 168 60 C190 62 200 80 200 100Z" fill="#b8c99a" />
+
+            <rect x="20" y="20" width="230" height="44" rx="16" fill="#5e6f45" />
+            <text x="40" y="48" fontSize="14" fill="#ffffff" fontFamily="Inter, sans-serif">
                 Let's review the sprint tokens
             </text>
-            <rect x="150" y="170" width="150" height="40" rx="14" fill="#ffffff" stroke="#ddd5c8" />
-            <text x="166" y="195" fontSize="13" fill="#2b2a26" fontFamily="Inter, sans-serif">
+
+            <rect x="150" y="190" width="230" height="44" rx="16" fill="#ffffff" stroke="#ddd5c8" />
+            <text x="170" y="218" fontSize="14" fill="#2b2a26" fontFamily="Inter, sans-serif">
                 Looking clean and calm!
             </text>
         </svg>
