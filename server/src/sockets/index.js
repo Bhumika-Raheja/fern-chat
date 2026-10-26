@@ -4,14 +4,14 @@ import User from "../models/User.js";
 import Conversation from "../models/Conversation.js";
 import { env } from "../config/env.js";
 import { registerMessageHandlers } from "./handlers/message.js";
-import { userConnected, userDisconnected, onlineAmong } from "./presence.js";
 import { registerTypingHandlers } from "./handlers/typing.js";
+import { userConnected, userDisconnected, onlineAmong } from "./presence.js";
 
 export function initSockets(httpServer) {
     const io = new Server(httpServer, {
         cors: { origin: env.CLIENT_ORIGIN, credentials: true },
-        pingInterval: 10000, // check every 10 seconds (default 25)
-        pingTimeout: 5000, // give up after 5 more seconds (default 20)
+        pingInterval: 10000,
+        pingTimeout: 5000,
     });
 
     // The gatekeeper: runs before any connection is accepted
@@ -44,6 +44,7 @@ export function initSockets(httpServer) {
         socket.on("disconnect", (reason) => {
             console.log(`Socket disconnected: ${socket.user.name} (${reason})`);
             userDisconnected(userId, () => {
+                console.log(`[presence] ${socket.user.name} is now offline`);
                 User.updateOne({ _id: userId }, { lastSeenAt: new Date() }).catch(() => { });
                 if (rooms.length) io.to(rooms).emit("presence:update", { userId, online: false });
             });

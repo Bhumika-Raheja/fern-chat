@@ -1,4 +1,4 @@
-const GRACE_MS = 5000;
+const GRACE_MS = 3000;
 
 const counts = new Map(); // userId -> number of open connections
 const timers = new Map(); // userId -> pending "go offline" timer
@@ -11,6 +11,7 @@ export function userConnected(userId) {
 
     const wasOnline = counts.has(id);
     counts.set(id, (counts.get(id) || 0) + 1);
+    console.log(`[presence] ${id} open connections: ${counts.get(id)}`);
     return !wasOnline;
 }
 
@@ -18,6 +19,7 @@ export function userConnected(userId) {
 export function userDisconnected(userId, onOffline) {
     const id = String(userId);
     const left = (counts.get(id) || 1) - 1;
+    console.log(`[presence] ${id} open connections: ${left}`);
 
     if (left > 0) {
         counts.set(id, left);
