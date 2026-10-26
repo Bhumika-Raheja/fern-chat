@@ -17,6 +17,25 @@ function onSocketConnect() {
     useMessageStore.getState().syncAfterReconnect();
 }
 
+// Runs for every new message the server pushes to me
+function onNewMessage(m) {
+    useMessageStore.getState().receiveMessage(m);
+
+    const senderId = m.senderId?._id;
+    if (senderId) useTypingStore.getState().clearTyping(m.conversationId, senderId);
+
+    // Unread badges: only for messages from other people
+    const myId = useAuthStore.getState().user?.id;
+    if (senderId && senderId !== myId) {
+        const conv = useConversationStore.getState();
+        if (m.conversationId === conv.activeId) {
+            conv.markRead(m.conversationId); // I'm looking at it, so it's read
+        } else {
+            conv.bumpUnread(m.conversationId);
+        }
+    }
+}
+
 export default function Chat() {
     const navigate = useNavigate();
     const { token, setSession, logout } = useAuthStore();
@@ -41,12 +60,7 @@ export default function Chat() {
                 socket.off("typing");
                 socket.off("connect", onSocketConnect);
 
-                socket.on("message:new", (m) => {
-                    useMessageStore.getState().receiveMessage(m);
-                    // The sender has stopped typing once their message arrives
-                    const senderId = m.senderId?._id;
-                    if (senderId) useTypingStore.getState().clearTyping(m.conversationId, senderId);
-                });
+                socket.on("message:new", onNewMessage);
                 socket.on("presence:list", (ids) => usePresenceStore.getState().setList(ids));
                 socket.on("presence:update", (p) =>
                     usePresenceStore.getState().setOne(p.userId, p.online)

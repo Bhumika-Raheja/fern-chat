@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
     createConversation,
     listConversations,
+    markRead,
 } from "../controllers/conversationController.js";
 import { sendMessage, getMessages } from "../controllers/messageController.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -15,5 +16,6 @@ router.post("/", createConversation);
 
 router.get("/:id/messages", getMessages);
 router.post("/:id/messages", sendMessage);
+router.post("/:id/read", markRead);
 
 export default router;

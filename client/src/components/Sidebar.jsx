@@ -12,16 +12,24 @@ function Section({ title, items, activeId, onSelect, renderName }) {
             {items.length === 0 && (
                 <p className="px-3 text-sm text-muted">Nothing here yet</p>
             )}
-            {items.map((c) => (
-                <button
-                    key={c._id}
-                    onClick={() => onSelect(c._id)}
-                    className={`w-full rounded-lg px-3 py-1.5 text-left text-sm ${activeId === c._id ? "bg-primary text-white" : "hover:bg-line/50"
-                        }`}
-                >
-                    {renderName(c)}
-                </button>
-            ))}
+            {items.map((c) => {
+                const unread = c.unreadCount || 0;
+                return (
+                    <button
+                        key={c._id}
+                        onClick={() => onSelect(c._id)}
+                        className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-left text-sm ${activeId === c._id ? "bg-primary text-white" : "hover:bg-line/50"
+                            } ${unread > 0 && activeId !== c._id ? "font-semibold" : ""}`}
+                    >
+                        <span className="min-w-0 truncate">{renderName(c)}</span>
+                        {unread > 0 && (
+                            <span className="min-w-[1.25rem] shrink-0 rounded-full bg-danger px-1.5 text-center text-xs font-semibold text-white">
+                                {unread > 99 ? "99+" : unread}
+                            </span>
+                        )}
+                    </button>
+                );
+            })}
         </div>
     );
 }
