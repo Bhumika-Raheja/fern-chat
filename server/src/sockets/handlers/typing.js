@@ -4,6 +4,8 @@ export function registerTypingHandlers(io, socket) {
     socket.on("typing", async (payload) => {
         try {
             const conversationId = payload?.conversationId;
+            console.log(`[typing] ${socket.user.name} in ${conversationId}`);
+
             const conversation = await getMemberConversation(conversationId, socket.user._id);
             if (!conversation) return;
 
