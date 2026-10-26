@@ -9,6 +9,8 @@ import { userConnected, userDisconnected, onlineAmong } from "./presence.js";
 export function initSockets(httpServer) {
     const io = new Server(httpServer, {
         cors: { origin: env.CLIENT_ORIGIN, credentials: true },
+        pingInterval: 10000, // check every 10 seconds (default 25)
+        pingTimeout: 5000, // give up after 5 more seconds (default 20)
     });
 
     // The gatekeeper: runs before any connection is accepted
