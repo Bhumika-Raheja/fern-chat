@@ -1,13 +1,29 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { getSocket } from "../socket/socket";
 
-export default function MessageInput({ placeholder, onSend }) {
+export default function MessageInput({ placeholder, conversationId, onSend }) {
     const [text, setText] = useState("");
+    const lastSent = useRef(0);
+
+    function handleChange(e) {
+        setText(e.target.value);
+
+        // Tell the server I'm typing, at most once every 2 seconds
+        const now = Date.now();
+        if (e.target.value && now - lastSent.current > 2000) {
+            lastSent.current = now;
+            const socket = getSocket();
+            console.log("[typing] sending", conversationId, "connected:", socket?.connected);
+            if (socket?.connected) socket.emit("typing", { conversationId });
+        }
+    }
 
     function submit() {
         const body = text.trim();
         if (!body) return;
         onSend(body);
         setText("");
+        lastSent.current = 0;
     }
 
     function handleKeyDown(e) {
@@ -23,7 +39,7 @@ export default function MessageInput({ placeholder, onSend }) {
             <div className="flex items-end gap-2 rounded-xl border border-line bg-white p-2">
                 <textarea
                     value={text}
-                    onChange={(e) => setText(e.target.value)}
+                    onChange={handleChange}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
                     rows={1}
