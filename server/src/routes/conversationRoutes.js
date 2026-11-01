@@ -10,6 +10,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { getReceipts, markRead } from "../controllers/receiptController.js";
 import { getReactions } from "../controllers/reactionController.js";
 import { addMembers, removeMember, changeMemberRole, leaveConversation } from "../controllers/membershipController.js";
+import { getPins, pinConversationMessage, unpinConversationMessage } from "../controllers/pinController.js";
 
 const router = Router();
 
@@ -29,6 +30,9 @@ router.get("/:id/messages", getMessages);
 router.get("/:id/messages/search", searchMessages);
 router.get("/:id/messages/reactions", getReactions);
 router.post("/:id/messages", sendMessage);
+router.get("/:id/pins", getPins);
+router.post("/:id/messages/:messageId/pin", pinConversationMessage);
+router.delete("/:id/messages/:messageId/pin", unpinConversationMessage);
 router.post("/:id/read", markRead);
 router.get("/:id/receipts", getReceipts);
 

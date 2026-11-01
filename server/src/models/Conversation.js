@@ -8,6 +8,10 @@ const conversationSchema = new mongoose.Schema(
         description: { type: String, trim: true, maxlength: 200, default: "" },
         memberIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
         adminIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+        pinnedMessageIds: {
+            type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Message" }],
+            default: [],
+        },
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         lastMessageAt: { type: Date, default: Date.now, index: true },
     },
