@@ -171,3 +171,27 @@ export async function listMessages({ conversationId, before, after, limit }) {
 
   return { messages, nextCursor };
 }
+
+export async function searchConversationMessages({ conversationId, query, before, limit = 20 }) {
+  const pattern = new RegExp(query.replace(/[.*+?^$()|[\]\\{}]/g, "\\$&"), "i");
+  const filter = {
+    conversationId,
+    deletedAt: null,
+    body: pattern,
+  };
+  if (before && mongoose.isValidObjectId(before)) {
+    filter._id = { $lt: before };
+  }
+
+  const found = await Message.find(filter)
+    .sort({ _id: -1 })
+    .limit(limit + 1)
+    .populate("senderId", "name avatarUrl")
+    .populate("reactions.userId", "name avatarUrl");
+
+  const hasMore = found.length > limit;
+  const messages = hasMore ? found.slice(0, limit) : found;
+  const nextCursor = hasMore ? messages[messages.length - 1]._id : null;
+
+  return { messages, nextCursor };
+}

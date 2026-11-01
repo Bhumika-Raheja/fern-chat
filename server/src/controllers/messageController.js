@@ -1,7 +1,9 @@
+import mongoose from "mongoose";
 import {
   getMemberConversation,
   createMessage,
   listMessages,
+  searchConversationMessages,
   cleanAttachments,
 } from "../services/messageService.js";
 
@@ -60,6 +62,40 @@ export async function getMessages(req, res, next) {
     });
 
     res.json({ messages, nextCursor, hasMoreNewer: !!hasMoreNewer });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function searchMessages(req, res, next) {
+  try {
+    const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (query.length < 2) {
+      return res.status(400).json({ message: "Search query must be at least 2 characters" });
+    }
+    if (query.length > 100) {
+      return res.status(400).json({ message: "Search query must be 100 characters or fewer" });
+    }
+
+    const before = req.query.before;
+    if (before !== undefined && before !== "" && !mongoose.isValidObjectId(before)) {
+      return res.status(400).json({ message: "Invalid cursor" });
+    }
+
+    const conversation = await getMemberConversation(req.params.id, req.user._id);
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 50);
+    const { messages, nextCursor } = await searchConversationMessages({
+      conversationId: conversation._id,
+      query,
+      before,
+      limit,
+    });
+
+    res.json({ messages, nextCursor });
   } catch (err) {
     next(err);
   }

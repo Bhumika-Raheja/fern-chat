@@ -5,7 +5,7 @@ import {
     getConversation,
     updateConversation,
 } from "../controllers/conversationController.js";
-import { sendMessage, getMessages } from "../controllers/messageController.js";
+import { sendMessage, getMessages, searchMessages } from "../controllers/messageController.js";
 import { requireAuth } from "../middleware/auth.js";
 import { getReceipts, markRead } from "../controllers/receiptController.js";
 import { getReactions } from "../controllers/reactionController.js";
@@ -26,6 +26,7 @@ router.patch("/:id/members/:userId/role", changeMemberRole);
 router.post("/:id/leave", leaveConversation);
 
 router.get("/:id/messages", getMessages);
+router.get("/:id/messages/search", searchMessages);
 router.get("/:id/messages/reactions", getReactions);
 router.post("/:id/messages", sendMessage);
 router.post("/:id/read", markRead);
