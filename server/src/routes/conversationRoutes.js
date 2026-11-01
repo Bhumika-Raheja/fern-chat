@@ -2,6 +2,8 @@ import { Router } from "express";
 import {
     createConversation,
     listConversations,
+    getConversation,
+    updateConversation,
 } from "../controllers/conversationController.js";
 import { sendMessage, getMessages } from "../controllers/messageController.js";
 import { requireAuth } from "../middleware/auth.js";
@@ -15,6 +17,8 @@ router.use(requireAuth); // every route below needs a logged-in user
 
 router.get("/", listConversations);
 router.post("/", createConversation);
+router.get("/:id", getConversation);
+router.patch("/:id", updateConversation);
 
 router.post("/:id/members", addMembers);
 router.delete("/:id/members/:userId", removeMember);

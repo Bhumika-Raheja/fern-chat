@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Conversation from "../models/Conversation.js";
 import User from "../models/User.js";
 import { connectConversationMembers } from "../sockets/conversations.js";
+import { withConversationLock } from "../services/conversationLock.js";
 import Message from "../models/Message.js";
 import ReadState from "../models/ReadState.js";
 
@@ -151,6 +152,109 @@ export async function listConversations(req, res, next) {
 
         res.json({ conversations: result });
     } catch (err) {
+        next(err);
+    }
+}
+
+export async function getConversation(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ message: "Invalid conversation ID" });
+        }
+
+        const conversation = await Conversation.findOne({ _id: id, memberIds: req.user._id })
+            .populate("memberIds", "name avatarUrl");
+        if (!conversation) {
+            return res.status(404).json({ message: "Conversation not found" });
+        }
+
+        res.json({ conversation: conversation.toObject() });
+    } catch (err) {
+        next(err);
+    }
+}
+
+export async function updateConversation(req, res, next) {
+    try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ message: "Invalid conversation ID" });
+        }
+
+        const { name, description } = req.body || {};
+        if (name === undefined && description === undefined) {
+            return res.status(400).json({ message: "Provide a name or description to update" });
+        }
+        if (name !== undefined && (typeof name !== "string" || !name.trim())) {
+            return res.status(400).json({ message: "Name is required" });
+        }
+        if (description !== undefined &&
+            (typeof description !== "string" || description.trim().length > 200)) {
+            return res.status(400).json({ message: "Description must be 200 characters or fewer" });
+        }
+
+        await withConversationLock(String(id), async () => {
+            const conversation = await Conversation.findOne({ _id: id, memberIds: req.user._id });
+            if (!conversation) {
+                return res.status(404).json({ message: "Conversation not found" });
+            }
+            if (conversation.type === "dm") {
+                return res.status(400).json({ message: "Direct messages do not have editable settings" });
+            }
+            if (!conversation.adminIds.map(String).includes(String(req.user._id))) {
+                return res.status(403).json({ message: "Only admins can update conversation settings" });
+            }
+
+            const updates = {};
+            if (name !== undefined) {
+                const cleanName = conversation.type === "channel"
+                    ? name.trim().toLowerCase().replace(/\s+/g, "-")
+                    : name.trim();
+                if (!cleanName || cleanName.length > 40) {
+                    return res.status(400).json({ message: "Name must be 40 characters or fewer" });
+                }
+                if (cleanName !== conversation.name) updates.name = cleanName;
+            }
+            if (description !== undefined) {
+                const cleanDescription = description.trim();
+                if (cleanDescription !== conversation.description) {
+                    updates.description = cleanDescription;
+                }
+            }
+
+            if (Object.keys(updates).length === 0) {
+                await conversation.populate("memberIds", "name avatarUrl");
+                return res.json({ conversation: conversation.toObject() });
+            }
+
+            const updated = await Conversation.findOneAndUpdate(
+                {
+                    _id: conversation._id,
+                    memberIds: req.user._id,
+                    adminIds: req.user._id,
+                    __v: conversation.__v === undefined ? { $exists: false } : conversation.__v,
+                },
+                { $set: updates, $inc: { __v: 1 } },
+                { returnDocument: "after", runValidators: true }
+            );
+            if (!updated) {
+                return res.status(409).json({ message: "Conversation settings changed at the same time. Please try again." });
+            }
+
+            await updated.populate("memberIds", "name avatarUrl");
+            const data = updated.toObject();
+            const io = req.app.get("io");
+            if (io) {
+                const memberRooms = data.memberIds.map((member) => "user:" + String(member._id || member));
+                if (memberRooms.length) io.to(memberRooms).emit("conversation:updated", data);
+            }
+            return res.json({ conversation: data });
+        });
+    } catch (err) {
+        if (err.code === 11000) {
+            return res.status(409).json({ message: "A channel with this name already exists" });
+        }
         next(err);
     }
 }
