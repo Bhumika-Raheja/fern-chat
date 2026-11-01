@@ -89,3 +89,37 @@ export async function me(req, res) {
         },
     });
 }
+
+export async function changePassword(req, res, next) {
+    try {
+        const { currentPassword, newPassword } = req.body || {};
+        if (typeof newPassword !== "string" || newPassword.length < 8 || newPassword.length > 128) {
+            return res.status(400).json({ message: "New password must be between 8 and 128 characters" });
+        }
+
+        const user = await User.findById(req.user._id).select("+passwordHash");
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        if (user.passwordHash) {
+            if (typeof currentPassword !== "string" || !currentPassword) {
+                return res.status(400).json({ message: "Current password is required" });
+            }
+            const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+            if (!isMatch) {
+                return res.status(401).json({ message: "Current password is incorrect" });
+            }
+            if (newPassword === currentPassword) {
+                return res.status(400).json({ message: "New password must be different from your current password" });
+            }
+        }
+
+        user.passwordHash = await bcrypt.hash(newPassword, 10);
+        await user.save();
+
+        res.json({ ok: true, message: "Password updated" });
+    } catch (err) {
+        next(err);
+    }
+}
