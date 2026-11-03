@@ -6,4 +6,7 @@ export const env = {
   CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || "http://localhost:5173",
   MONGODB_URI: process.env.MONGODB_URI || "",
   JWT_SECRET: process.env.JWT_SECRET || "dev-secret",
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || "",
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || "",
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || "",
 };
