@@ -100,7 +100,9 @@ export default function ChatArea({ conversation }) {
       <MessageInput
         placeholder={`Message ${title}`}
         conversationId={conversation._id}
-        onSend={(body) => sendMessage(conversation._id, body, user)}
+        onSend={(body, attachments) =>
+          sendMessage(conversation._id, body, user, attachments)
+        }
       />
     </div>
   );

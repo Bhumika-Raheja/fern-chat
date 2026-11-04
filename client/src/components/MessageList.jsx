@@ -20,6 +20,12 @@ function dayLabel(iso) {
   });
 }
 
+function prettySize(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 function ClockIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -42,6 +48,15 @@ function ArrowDownIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 5v14" />
       <path d="M6 13l6 6 6-6" />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
     </svg>
   );
 }
@@ -91,6 +106,12 @@ export default function MessageList({
     atBottom.current = distance < 120;
     setShowJump(distance > 300);
     if (el.scrollTop < 80 && hasMore && !loadingOlder) onLoadOlder();
+  }
+
+  // An image finished loading and made the list taller: stay at the bottom if we were there
+  function handleImageLoad() {
+    const el = boxRef.current;
+    if (el && atBottom.current) el.scrollTop = el.scrollHeight;
   }
 
   function jumpToLatest() {
@@ -166,6 +187,40 @@ export default function MessageList({
                       m.status === "failed" ? "border-2 border-danger" : ""
                     }`}
                   >
+                    {(m.attachments || []).map((a, idx) =>
+                      a.kind === "image" ? (
+                        <a
+                          key={idx}
+                          href={a.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`block ${m.body ? "mb-2" : ""}`}
+                        >
+                          <img
+                            src={a.url}
+                            alt={a.name}
+                            onLoad={handleImageLoad}
+                            className="max-h-64 w-auto max-w-full rounded-lg"
+                          />
+                        </a>
+                      ) : (
+                        <a
+                          key={idx}
+                          href={a.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 ${
+                            m.body ? "mb-2" : ""
+                          }`}
+                        >
+                          <FileIcon />
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium">{a.name}</span>
+                            <span className="block text-xs opacity-70">{prettySize(a.size)}</span>
+                          </span>
+                        </a>
+                      )
+                    )}
                     {m.body}
                   </div>
 

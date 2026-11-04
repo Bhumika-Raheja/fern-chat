@@ -4,62 +4,98 @@ import Message from "../models/Message.js";
 
 // Returns the conversation only if this user is a member, otherwise null
 export async function getMemberConversation(conversationId, userId) {
-    if (!mongoose.isValidObjectId(conversationId)) return null;
-    return Conversation.findOne({ _id: conversationId, memberIds: userId });
+  if (!mongoose.isValidObjectId(conversationId)) return null;
+  return Conversation.findOne({ _id: conversationId, memberIds: userId });
 }
 
-export async function createMessage({ conversationId, senderId, body, clientId }) {
-    // Already saved this one? Return it instead of saving again
-    if (clientId) {
-        const existing = await Message.findOne({ conversationId, senderId, clientId });
-        if (existing) return { message: existing, duplicate: true };
-    }
+// Checks the attachments sent by a client. Returns a clean list, or null if invalid.
+export function cleanAttachments(input) {
+  if (!input) return [];
+  if (!Array.isArray(input) || input.length > 4) return null;
 
-    try {
-        const message = await Message.create({ conversationId, senderId, body, clientId });
-        await Conversation.updateOne(
-            { _id: conversationId },
-            { lastMessageAt: message.createdAt }
-        );
-        return { message, duplicate: false };
-    } catch (err) {
-        // Two identical sends at the same moment: the database blocks the second
-        if (err.code === 11000) {
-            const existing = await Message.findOne({ conversationId, senderId, clientId });
-            return { message: existing, duplicate: true };
-        }
-        throw err;
+  const out = [];
+  for (const a of input) {
+    if (!a || typeof a.url !== "string") return null;
+    // Only files that were uploaded to our Cloudinary are allowed
+    if (!a.url.startsWith("https://res.cloudinary.com/")) return null;
+
+    out.push({
+      url: a.url,
+      name: String(a.name || "file").slice(0, 200),
+      size: Number(a.size) || 0,
+      mimeType: String(a.mimeType || "").slice(0, 100),
+      kind: a.kind === "image" ? "image" : "file",
+      width: Number(a.width) || undefined,
+      height: Number(a.height) || undefined,
+    });
+  }
+  return out;
+}
+
+export async function createMessage({
+  conversationId,
+  senderId,
+  body,
+  clientId,
+  attachments = [],
+}) {
+  // Already saved this one? Return it instead of saving again
+  if (clientId) {
+    const existing = await Message.findOne({ conversationId, senderId, clientId });
+    if (existing) return { message: existing, duplicate: true };
+  }
+
+  try {
+    const message = await Message.create({
+      conversationId,
+      senderId,
+      body,
+      clientId,
+      attachments,
+    });
+    await Conversation.updateOne(
+      { _id: conversationId },
+      { lastMessageAt: message.createdAt }
+    );
+    return { message, duplicate: false };
+  } catch (err) {
+    // Two identical sends at the same moment: the database blocks the second
+    if (err.code === 11000) {
+      const existing = await Message.findOne({ conversationId, senderId, clientId });
+      return { message: existing, duplicate: true };
     }
+    throw err;
+  }
 }
 
 export async function listMessages({ conversationId, before, after, limit }) {
-    // Catching up: messages newer than "after", oldest first
-    if (after && mongoose.isValidObjectId(after)) {
-        const found = await Message.find({ conversationId, _id: { $gt: after } })
-            .sort({ _id: 1 })
-            .limit(limit + 1)
-            .populate("senderId", "name avatarUrl");
+  // Catching up: messages newer than "after", oldest first
+  if (after && mongoose.isValidObjectId(after)) {
+    const found = await Message.find({ conversationId, _id: { $gt: after } })
+      .sort({ _id: 1 })
+      .limit(limit + 1)
+      .populate("senderId", "name avatarUrl");
 
-        const hasMoreNewer = found.length > limit;
-        const messages = hasMoreNewer ? found.slice(0, limit) : found;
-        return { messages, nextCursor: null, hasMoreNewer };
-    }
+    const hasMoreNewer = found.length > limit;
+    const messages = hasMoreNewer ? found.slice(0, limit) : found;
+    return { messages, nextCursor: null, hasMoreNewer };
+  }
 
-    // Scrolling up: messages older than "before", newest first
-    const query = { conversationId };
-    if (before && mongoose.isValidObjectId(before)) {
-        query._id = { $lt: before };
-    }
+  // Scrolling up: messages older than "before", newest first
+  const query = { conversationId };
+  if (before && mongoose.isValidObjectId(before)) {
+    query._id = { $lt: before };
+  }
 
-    // Ask for one extra, just to learn whether older messages exist
-    const found = await Message.find(query)
-        .sort({ _id: -1 })
-        .limit(limit + 1)
-        .populate("senderId", "name avatarUrl");
+  // Ask for one extra, just to learn whether older messages exist
+  const found = await Message.find(query)
+    .sort({ _id: -1 })
+    .limit(limit + 1)
+    .populate("senderId", "name avatarUrl");
 
-    const hasMore = found.length > limit;
-    const messages = hasMore ? found.slice(0, limit) : found;
-    const nextCursor = hasMore ? messages[messages.length - 1]._id : null;
+  const hasMore = found.length > limit;
+  const messages = hasMore ? found.slice(0, limit) : found;
+  const nextCursor = hasMore ? messages[messages.length - 1]._id : null;
 
-    return { messages, nextCursor };
+  return { messages, nextCursor };
 }
