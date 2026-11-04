@@ -13,92 +13,99 @@ import ConnectionBanner from "../components/ConnectionBanner";
 
 // Runs every time the socket connects (the first time and after each reconnect)
 function onSocketConnect() {
-    useConversationStore.getState().fetchConversations();
-    useMessageStore.getState().syncAfterReconnect();
+  useConversationStore.getState().fetchConversations();
+  useMessageStore.getState().syncAfterReconnect();
 }
 
 // Runs for every new message the server pushes to me
 function onNewMessage(m) {
-    useMessageStore.getState().receiveMessage(m);
+  useMessageStore.getState().receiveMessage(m);
 
-    const senderId = m.senderId?._id;
-    if (senderId) useTypingStore.getState().clearTyping(m.conversationId, senderId);
+  const senderId = m.senderId?._id;
+  if (senderId) useTypingStore.getState().clearTyping(m.conversationId, senderId);
 
-    // Unread badges: only for messages from other people
-    const myId = useAuthStore.getState().user?.id;
-    if (senderId && senderId !== myId) {
-        const conv = useConversationStore.getState();
-        if (m.conversationId === conv.activeId) {
-            conv.markRead(m.conversationId); // I'm looking at it, so it's read
-        } else {
-            conv.bumpUnread(m.conversationId);
-        }
+  // Unread badges: only for messages from other people
+  const myId = useAuthStore.getState().user?.id;
+  if (senderId && senderId !== myId) {
+    const conv = useConversationStore.getState();
+    if (m.conversationId === conv.activeId) {
+      conv.markRead(m.conversationId); // I'm looking at it, so it's read
+    } else {
+      conv.bumpUnread(m.conversationId);
     }
+  }
+}
+
+// A message was edited or deleted
+function onUpdatedMessage(m) {
+  useMessageStore.getState().updateMessage(m);
 }
 
 export default function Chat() {
-    const navigate = useNavigate();
-    const { token, setSession, logout } = useAuthStore();
-    const { conversations, activeId, fetchConversations } = useConversationStore();
+  const navigate = useNavigate();
+  const { token, setSession, logout } = useAuthStore();
+  const { conversations, activeId, fetchConversations } = useConversationStore();
 
-    useEffect(() => {
-        if (!token) {
-            navigate("/login");
-            return;
-        }
-        api
-            .get("/api/auth/me")
-            .then((res) => {
-                setSession(token, res.data.user);
-                fetchConversations();
-                const socket = connectSocket(token);
+  useEffect(() => {
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+    api
+      .get("/api/auth/me")
+      .then((res) => {
+        setSession(token, res.data.user);
+        fetchConversations();
+        const socket = connectSocket(token);
 
-                // remove old listeners first, so none is ever registered twice
-                socket.off("message:new");
-                socket.off("presence:list");
-                socket.off("presence:update");
-                socket.off("typing");
-                socket.off("connect", onSocketConnect);
+        // remove old listeners first, so none is ever registered twice
+        socket.off("message:new");
+        socket.off("message:updated");
+        socket.off("presence:list");
+        socket.off("presence:update");
+        socket.off("typing");
+        socket.off("connect", onSocketConnect);
 
-                socket.on("message:new", onNewMessage);
-                socket.on("presence:list", (ids) => usePresenceStore.getState().setList(ids));
-                socket.on("presence:update", (p) =>
-                    usePresenceStore.getState().setOne(p.userId, p.online)
-                );
-                socket.on("typing", (t) =>
-                    useTypingStore.getState().setTyping(t.conversationId, t.userId, t.name)
-                );
-                socket.on("connect", onSocketConnect);
-            })
-            .catch(() => {
-                logout();
-                navigate("/login");
-            });
-    }, []);
-
-    function handleLogout() {
-        disconnectSocket();
+        socket.on("message:new", onNewMessage);
+        socket.on("message:updated", onUpdatedMessage);
+        socket.on("presence:list", (ids) => usePresenceStore.getState().setList(ids));
+        socket.on("presence:update", (p) =>
+          usePresenceStore.getState().setOne(p.userId, p.online)
+        );
+        socket.on("typing", (t) =>
+          useTypingStore.getState().setTyping(t.conversationId, t.userId, t.name)
+        );
+        socket.on("connect", onSocketConnect);
+      })
+      .catch(() => {
         logout();
         navigate("/login");
-    }
+      });
+  }, []);
 
-    const active = conversations.find((c) => c._id === activeId);
+  function handleLogout() {
+    disconnectSocket();
+    logout();
+    navigate("/login");
+  }
 
-    return (
-        <div className="flex h-screen">
-            <Sidebar onLogout={handleLogout} />
-            <main className="flex min-w-0 flex-1 flex-col bg-cream">
-                <ConnectionBanner />
-                <div className="flex min-h-0 flex-1">
-                    {active ? (
-                        <ChatArea key={active._id} conversation={active} />
-                    ) : (
-                        <div className="flex flex-1 items-center justify-center">
-                            <p className="text-muted">Select a conversation</p>
-                        </div>
-                    )}
-                </div>
-            </main>
+  const active = conversations.find((c) => c._id === activeId);
+
+  return (
+    <div className="flex h-screen">
+      <Sidebar onLogout={handleLogout} />
+      <main className="flex min-w-0 flex-1 flex-col bg-cream">
+        <ConnectionBanner />
+        <div className="flex min-h-0 flex-1">
+          {active ? (
+            <ChatArea key={active._id} conversation={active} />
+          ) : (
+            <div className="flex flex-1 items-center justify-center">
+              <p className="text-muted">Select a conversation</p>
+            </div>
+          )}
         </div>
-    );
+      </main>
+    </div>
+  );
 }

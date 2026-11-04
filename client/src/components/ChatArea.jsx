@@ -43,6 +43,8 @@ export default function ChatArea({ conversation }) {
   const loadOlder = useMessageStore((s) => s.loadOlder);
   const sendMessage = useMessageStore((s) => s.sendMessage);
   const retryMessage = useMessageStore((s) => s.retryMessage);
+  const editMessage = useMessageStore((s) => s.editMessage);
+  const deleteMessage = useMessageStore((s) => s.deleteMessage);
   const state = useMessageStore((s) => s.byConversation[conversation._id]);
 
   useEffect(() => {
@@ -93,6 +95,8 @@ export default function ChatArea({ conversation }) {
         myId={user?.id}
         onLoadOlder={() => loadOlder(conversation._id)}
         onRetry={(clientId) => retryMessage(conversation._id, clientId)}
+        onEdit={editMessage}
+        onDelete={deleteMessage}
       />
 
       <TypingIndicator conversationId={conversation._id} />

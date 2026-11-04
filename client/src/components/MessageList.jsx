@@ -70,11 +70,49 @@ export default function MessageList({
   myId,
   onLoadOlder,
   onRetry,
+  onEdit,
+  onDelete,
 }) {
   const boxRef = useRef(null);
   const atBottom = useRef(true);
   const prev = useRef({ firstId: null, lastId: null, height: 0 });
   const [showJump, setShowJump] = useState(false);
+
+  // Editing state: which message, its text, and any error
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [editError, setEditError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function startEdit(m) {
+    setEditingId(m._id);
+    setEditText(m.body || "");
+    setEditError("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText("");
+    setEditError("");
+  }
+
+  async function saveEdit(m) {
+    const body = editText.trim();
+    if (body === (m.body || "")) return cancelEdit();
+
+    setSaving(true);
+    const res = await onEdit(m._id, body);
+    setSaving(false);
+
+    if (res.ok) cancelEdit();
+    else setEditError(res.error || "Could not save the change");
+  }
+
+  async function remove(m) {
+    if (!window.confirm("Delete this message? This can't be undone.")) return;
+    const res = await onDelete(m._id);
+    if (!res.ok) window.alert(res.error || "Could not delete the message");
+  }
 
   // Decide where the scroll position should be after the messages change
   useLayoutEffect(() => {
@@ -144,11 +182,17 @@ export default function MessageList({
           const before = messages[i - 1];
           const mine = m.senderId?._id === myId;
           const name = m.senderId?.name || "Unknown";
+          const deleted = !!m.deletedAt;
+          const isEditing = editingId === m._id;
+          const canAct = mine && m.status === "sent" && !deleted;
 
           const newDay = !before || new Date(before.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
           const sameSender = before && before.senderId?._id === m.senderId?._id;
           const closeInTime = before && new Date(m.createdAt) - new Date(before.createdAt) < 5 * 60 * 1000;
           const showHeader = newDay || !sameSender || !closeInTime;
+
+          let bubbleStyle = mine ? "bg-primary text-white" : "border border-line bg-received";
+          if (deleted) bubbleStyle = "border border-line bg-transparent text-muted";
 
           return (
             <div key={m._id}>
@@ -161,7 +205,7 @@ export default function MessageList({
               )}
 
               <div
-                className={`flex gap-2 ${mine ? "justify-end" : "justify-start"} ${
+                className={`group flex gap-2 ${mine ? "justify-end" : "justify-start"} ${
                   showHeader && !newDay ? "mt-4" : "mt-1"
                 }`}
               >
@@ -176,57 +220,102 @@ export default function MessageList({
                   {!mine && showHeader && (
                     <p className="mb-0.5 flex items-baseline gap-2">
                       <span className="text-sm font-semibold">{name}</span>
-                      <span className="text-xs text-muted">{formatTime(m.createdAt)}</span>
+                      <span className="text-xs text-muted">
+                        {formatTime(m.createdAt)}
+                        {m.editedAt && !deleted && " · edited"}
+                      </span>
                     </p>
                   )}
 
-                  <div
-                    className={`whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm ${
-                      mine ? "bg-primary text-white" : "border border-line bg-received"
-                    } ${m.status === "pending" ? "opacity-60" : ""} ${
-                      m.status === "failed" ? "border-2 border-danger" : ""
-                    }`}
-                  >
-                    {(m.attachments || []).map((a, idx) =>
-                      a.kind === "image" ? (
-                        <a
-                          key={idx}
-                          href={a.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`block ${m.body ? "mb-2" : ""}`}
+                  {isEditing ? (
+                    <div className="min-w-[18rem] rounded-2xl border border-primary bg-white p-2">
+                      <textarea
+                        autoFocus
+                        rows={2}
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") cancelEdit();
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            saveEdit(m);
+                          }
+                        }}
+                        className="w-full resize-none bg-transparent px-1 text-sm outline-none"
+                      />
+                      {editError && <p className="px-1 text-xs text-danger">{editError}</p>}
+                      <div className="mt-1 flex justify-end gap-2 text-xs">
+                        <button
+                          onClick={cancelEdit}
+                          className="rounded-lg px-3 py-1 text-muted hover:bg-cream"
                         >
-                          <img
-                            src={a.url}
-                            alt={a.name}
-                            onLoad={handleImageLoad}
-                            className="max-h-64 w-auto max-w-full rounded-lg"
-                          />
-                        </a>
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => saveEdit(m)}
+                          disabled={saving}
+                          className="rounded-lg bg-primary px-3 py-1 text-white disabled:opacity-60"
+                        >
+                          {saving ? "Saving..." : "Save"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className={`whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm ${bubbleStyle} ${
+                        m.status === "pending" ? "opacity-60" : ""
+                      } ${m.status === "failed" ? "border-2 border-danger" : ""}`}
+                    >
+                      {deleted ? (
+                        <span className="italic">This message was deleted</span>
                       ) : (
-                        <a
-                          key={idx}
-                          href={a.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 ${
-                            m.body ? "mb-2" : ""
-                          }`}
-                        >
-                          <FileIcon />
-                          <span className="min-w-0">
-                            <span className="block truncate font-medium">{a.name}</span>
-                            <span className="block text-xs opacity-70">{prettySize(a.size)}</span>
-                          </span>
-                        </a>
-                      )
-                    )}
-                    {m.body}
-                  </div>
+                        <>
+                          {(m.attachments || []).map((a, idx) =>
+                            a.kind === "image" ? (
+                              <a
+                                key={idx}
+                                href={a.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`block ${m.body ? "mb-2" : ""}`}
+                              >
+                                <img
+                                  src={a.url}
+                                  alt={a.name}
+                                  onLoad={handleImageLoad}
+                                  className="max-h-64 w-auto max-w-full rounded-lg"
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                key={idx}
+                                href={a.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 ${
+                                  m.body ? "mb-2" : ""
+                                }`}
+                              >
+                                <FileIcon />
+                                <span className="min-w-0">
+                                  <span className="block truncate font-medium">{a.name}</span>
+                                  <span className="block text-xs opacity-70">
+                                    {prettySize(a.size)}
+                                  </span>
+                                </span>
+                              </a>
+                            )
+                          )}
+                          {m.body}
+                        </>
+                      )}
+                    </div>
+                  )}
 
-                  {mine && (
+                  {mine && !isEditing && (
                     <p className="mt-0.5 flex items-center justify-end gap-1 text-xs text-muted">
                       {formatTime(m.createdAt)}
+                      {m.editedAt && !deleted && <span>· edited</span>}
                       {m.status === "pending" && (
                         <span className="flex items-center gap-1">
                           <ClockIcon /> Sending...
@@ -241,6 +330,16 @@ export default function MessageList({
                             className="font-medium underline"
                           >
                             Retry
+                          </button>
+                        </span>
+                      )}
+                      {canAct && (
+                        <span className="ml-2 flex gap-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                          <button onClick={() => startEdit(m)} className="hover:text-ink">
+                            Edit
+                          </button>
+                          <button onClick={() => remove(m)} className="hover:text-danger">
+                            Delete
                           </button>
                         </span>
                       )}

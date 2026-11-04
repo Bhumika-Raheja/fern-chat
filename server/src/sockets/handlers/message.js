@@ -2,7 +2,15 @@ import {
   getMemberConversation,
   createMessage,
   cleanAttachments,
+  editMessage,
+  deleteMessage,
 } from "../../services/messageService.js";
+
+// Turn a saved message into plain data, with the sender's name filled in
+async function toData(message) {
+  await message.populate("senderId", "name avatarUrl");
+  return JSON.parse(JSON.stringify(message));
+}
 
 export function registerMessageHandlers(io, socket) {
   socket.on("message:send", async (payload, ack) => {
@@ -29,8 +37,7 @@ export function registerMessageHandlers(io, socket) {
         attachments,
       });
 
-      await message.populate("senderId", "name avatarUrl");
-      const data = JSON.parse(JSON.stringify(message));
+      const data = await toData(message);
 
       // Only announce a message the first time it is saved
       if (!duplicate) {
@@ -40,6 +47,43 @@ export function registerMessageHandlers(io, socket) {
     } catch (err) {
       console.error(err);
       reply({ ok: false, error: "Could not send message" });
+    }
+  });
+
+  socket.on("message:edit", async (payload, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    try {
+      const result = await editMessage({
+        messageId: payload?.messageId,
+        userId: socket.user._id,
+        body: payload?.body,
+      });
+      if (result.error) return reply({ ok: false, error: result.error });
+
+      const data = await toData(result.message);
+      io.to(`conversation:${data.conversationId}`).emit("message:updated", data);
+      reply({ ok: true, message: data });
+    } catch (err) {
+      console.error(err);
+      reply({ ok: false, error: "Could not edit message" });
+    }
+  });
+
+  socket.on("message:delete", async (payload, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    try {
+      const result = await deleteMessage({
+        messageId: payload?.messageId,
+        userId: socket.user._id,
+      });
+      if (result.error) return reply({ ok: false, error: result.error });
+
+      const data = await toData(result.message);
+      io.to(`conversation:${data.conversationId}`).emit("message:updated", data);
+      reply({ ok: true, message: data });
+    } catch (err) {
+      console.error(err);
+      reply({ ok: false, error: "Could not delete message" });
     }
   });
 }

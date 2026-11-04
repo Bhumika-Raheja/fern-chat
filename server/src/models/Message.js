@@ -29,6 +29,8 @@ const messageSchema = new mongoose.Schema(
     body: { type: String, trim: true, maxlength: 4000, default: "" },
     attachments: { type: [attachmentSchema], default: [] },
     clientId: { type: String },
+    editedAt: { type: Date, default: null },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

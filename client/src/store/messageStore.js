@@ -55,6 +55,24 @@ function deliver(get, set, conversationId, message) {
   );
 }
 
+// Ask the server to do something and wait for its answer: { ok, message?, error? }
+function request(event, payload) {
+  return new Promise((resolve) => {
+    const socket = getSocket();
+    if (!socket || !socket.connected) {
+      resolve({ ok: false, error: "You're offline. Try again when you're back online." });
+      return;
+    }
+    socket.timeout(8000).emit(event, payload, (err, res) => {
+      if (err || !res) {
+        resolve({ ok: false, error: "No answer from the server. Please try again." });
+        return;
+      }
+      resolve(res);
+    });
+  });
+}
+
 // The _id of the newest message that is saved on the server
 function lastSavedId(messages) {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -157,6 +175,28 @@ export const useMessageStore = create((set, get) => ({
 
       return { ...c, messages: [...c.messages, final] };
     });
+  },
+
+  // A message I already have was edited or deleted
+  updateMessage: (message) => {
+    patch(set, message.conversationId, (c) => ({
+      ...c,
+      messages: c.messages.map((m) =>
+        m._id === message._id ? { ...message, status: "sent" } : m
+      ),
+    }));
+  },
+
+  editMessage: async (messageId, body) => {
+    const res = await request("message:edit", { messageId, body });
+    if (res.ok) get().updateMessage(res.message);
+    return res;
+  },
+
+  deleteMessage: async (messageId) => {
+    const res = await request("message:delete", { messageId });
+    if (res.ok) get().updateMessage(res.message);
+    return res;
   },
 
   sendMessage: (conversationId, body, user, attachments = []) => {

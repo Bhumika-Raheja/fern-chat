@@ -68,6 +68,56 @@ export async function createMessage({
   }
 }
 
+// Finds a message that this user is allowed to change:
+// they must be its sender AND still a member of its conversation.
+async function findOwnMessage(messageId, userId) {
+  if (!mongoose.isValidObjectId(messageId)) return { error: "Message not found" };
+
+  const message = await Message.findById(messageId);
+  if (!message) return { error: "Message not found" };
+
+  const conversation = await getMemberConversation(message.conversationId, userId);
+  if (!conversation) return { error: "Message not found" };
+
+  if (String(message.senderId) !== String(userId)) {
+    return { error: "You can only change your own messages" };
+  }
+  return { message };
+}
+
+export async function editMessage({ messageId, userId, body }) {
+  const found = await findOwnMessage(messageId, userId);
+  if (found.error) return found;
+  const { message } = found;
+
+  if (message.deletedAt) return { error: "This message was deleted" };
+
+  const text = typeof body === "string" ? body.trim() : "";
+  if (!text && message.attachments.length === 0) return { error: "Message can't be empty" };
+  if (text.length > 4000) return { error: "Message is too long" };
+
+  if (text !== message.body) {
+    message.body = text;
+    message.editedAt = new Date();
+    await message.save();
+  }
+  return { message };
+}
+
+export async function deleteMessage({ messageId, userId }) {
+  const found = await findOwnMessage(messageId, userId);
+  if (found.error) return found;
+  const { message } = found;
+
+  if (!message.deletedAt) {
+    message.body = "";
+    message.attachments = [];
+    message.deletedAt = new Date();
+    await message.save();
+  }
+  return { message };
+}
+
 export async function listMessages({ conversationId, before, after, limit }) {
   // Catching up: messages newer than "after", oldest first
   if (after && mongoose.isValidObjectId(after)) {
