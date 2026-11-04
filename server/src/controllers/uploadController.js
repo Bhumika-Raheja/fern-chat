@@ -31,7 +31,7 @@ export async function uploadFile(req, res, next) {
       },
     });
   } catch (err) {
-    console.error("Upload failed:", err.message);
+        console.error("Upload failed:", err.message);
     res.status(502).json({ message: "Could not upload the file. Please try again." });
   }
 }
