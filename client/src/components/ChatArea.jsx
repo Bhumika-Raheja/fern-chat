@@ -1,10 +1,12 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "../store/authStore";
 import { useMessageStore } from "../store/messageStore";
 import { usePresenceStore } from "../store/presenceStore";
+import { useReceiptStore } from "../store/receiptStore";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import TypingIndicator from "./TypingIndicator";
+import MembersDialog from "./MembersDialog";
 
 function GlobeIcon() {
   return (
@@ -37,6 +39,7 @@ function PeopleIcon() {
 }
 
 export default function ChatArea({ conversation }) {
+  const [showMembers, setShowMembers] = useState(false);
   const user = useAuthStore((s) => s.user);
   const online = usePresenceStore((s) => s.online);
   const fetchMessages = useMessageStore((s) => s.fetchMessages);
@@ -45,11 +48,16 @@ export default function ChatArea({ conversation }) {
   const retryMessage = useMessageStore((s) => s.retryMessage);
   const editMessage = useMessageStore((s) => s.editMessage);
   const deleteMessage = useMessageStore((s) => s.deleteMessage);
+  const setReaction = useMessageStore((s) => s.setReaction);
   const state = useMessageStore((s) => s.byConversation[conversation._id]);
+  const receiptState = useReceiptStore((s) => s.byConversation[conversation._id]);
+  const markRead = useReceiptStore((s) => s.markRead);
+  const onRead = useCallback((messageId) => markRead(conversation._id, messageId), [conversation._id, markRead]);
 
   useEffect(() => {
     fetchMessages(conversation._id);
-  }, [conversation._id]);
+    useReceiptStore.getState().fetchReceipts(conversation._id);
+  }, [conversation._id, fetchMessages]);
 
   let title = conversation.name;
   if (conversation.type === "channel") title = `# ${conversation.name}`;
@@ -73,10 +81,15 @@ export default function ChatArea({ conversation }) {
           </span>
         )}
 
-        <span className="flex items-center gap-1.5 text-sm text-muted">
-          <PeopleIcon />
-          {conversation.memberIds.length}
-        </span>
+        {conversation.type !== "dm" ? (
+          <button type="button" onClick={() => setShowMembers(true)}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted hover:bg-sidebar hover:text-ink"
+            aria-label="Manage conversation members">
+            <PeopleIcon /> {conversation.memberIds.length} Members
+          </button>
+        ) : (
+          <span className="flex items-center gap-1.5 text-sm text-muted"><PeopleIcon /> {conversation.memberIds.length}</span>
+        )}
 
         {conversation.type !== "dm" && (
           <span className="flex items-center gap-1.5 text-sm text-muted">
@@ -97,9 +110,15 @@ export default function ChatArea({ conversation }) {
         onRetry={(clientId) => retryMessage(conversation._id, clientId)}
         onEdit={editMessage}
         onDelete={deleteMessage}
+        onReact={setReaction}
+        onRead={onRead}
+        receipts={receiptState?.byUser}
+        group={conversation.type !== "dm"}
       />
 
       <TypingIndicator conversationId={conversation._id} />
+
+      {showMembers && <MembersDialog conversation={conversation} onClose={() => setShowMembers(false)} />}
 
       <MessageInput
         placeholder={`Message ${title}`}

@@ -1,5 +1,8 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import Avatar from "./Avatar";
+import MessageReceipt from "./MessageReceipt";
+import MessageReactions from "./MessageReactions";
+import { useVisibleRead } from "../hooks/useVisibleRead";
 
 function formatTime(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -35,14 +38,6 @@ function ClockIcon() {
   );
 }
 
-function TickIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12.500l4.500 4.500L19 7.500" />
-    </svg>
-  );
-}
-
 function ArrowDownIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -72,8 +67,13 @@ export default function MessageList({
   onRetry,
   onEdit,
   onDelete,
+  onReact,
+  onRead,
+  receipts,
+  group = false,
 }) {
   const boxRef = useRef(null);
+  useVisibleRead(boxRef, messages, onRead);
   const atBottom = useRef(true);
   const prev = useRef({ firstId: null, lastId: null, height: 0 });
   const [showJump, setShowJump] = useState(false);
@@ -83,35 +83,69 @@ export default function MessageList({
   const [editText, setEditText] = useState("");
   const [editError, setEditError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const actionPending = useRef(false);
 
   function startEdit(m) {
+    if (actionPending.current) return;
     setEditingId(m._id);
     setEditText(m.body || "");
     setEditError("");
   }
 
   function cancelEdit() {
+    if (actionPending.current) return;
     setEditingId(null);
     setEditText("");
     setEditError("");
   }
 
   async function saveEdit(m) {
+    if (actionPending.current || m.deletedAt) return;
     const body = editText.trim();
+    if (!body && !(m.attachments || []).length) {
+      setEditError("Message can't be empty");
+      return;
+    }
+    if (body.length > 4000) {
+      setEditError("Message is too long");
+      return;
+    }
     if (body === (m.body || "")) return cancelEdit();
 
+    actionPending.current = true;
     setSaving(true);
-    const res = await onEdit(m._id, body);
-    setSaving(false);
-
-    if (res.ok) cancelEdit();
-    else setEditError(res.error || "Could not save the change");
+    setEditError("");
+    try {
+      const res = await onEdit(m._id, body);
+      if (res.ok) {
+        setEditingId(null);
+        setEditText("");
+      } else {
+        setEditError(res.error || "Could not save the change");
+      }
+    } catch {
+      setEditError("Could not save the change. Please try again.");
+    } finally {
+      actionPending.current = false;
+      setSaving(false);
+    }
   }
 
   async function remove(m) {
+    if (actionPending.current) return;
     if (!window.confirm("Delete this message? This can't be undone.")) return;
-    const res = await onDelete(m._id);
-    if (!res.ok) window.alert(res.error || "Could not delete the message");
+    actionPending.current = true;
+    setDeletingId(m._id);
+    try {
+      const res = await onDelete(m._id);
+      if (!res.ok) window.alert(res.error || "Could not delete the message");
+    } catch {
+      window.alert("Could not delete the message. Please try again.");
+    } finally {
+      actionPending.current = false;
+      setDeletingId(null);
+    }
   }
 
   // Decide where the scroll position should be after the messages change
@@ -136,7 +170,7 @@ export default function MessageList({
     }
 
     prev.current = { firstId, lastId, height: el.scrollHeight };
-  }, [messages]);
+  }, [messages, myId]);
 
   function handleScroll() {
     const el = boxRef.current;
@@ -183,7 +217,7 @@ export default function MessageList({
           const mine = m.senderId?._id === myId;
           const name = m.senderId?.name || "Unknown";
           const deleted = !!m.deletedAt;
-          const isEditing = editingId === m._id;
+          const isEditing = editingId === m._id && !deleted;
           const canAct = mine && m.status === "sent" && !deleted;
 
           const newDay = !before || new Date(before.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
@@ -195,7 +229,7 @@ export default function MessageList({
           if (deleted) bubbleStyle = "border border-line bg-transparent text-muted";
 
           return (
-            <div key={m._id}>
+            <div key={m._id} data-message-id={m.status === "sent" ? m._id : undefined}>
               {newDay && (
                 <div className="my-4 flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-muted">
                   <span className="h-px flex-1 bg-line" />
@@ -228,13 +262,17 @@ export default function MessageList({
                   )}
 
                   {isEditing ? (
-                    <div className="min-w-[18rem] rounded-2xl border border-primary bg-white p-2">
+                    <div className="min-w-[min(18rem,60vw)] rounded-2xl border border-primary bg-white p-2">
                       <textarea
                         autoFocus
                         rows={2}
                         value={editText}
+                        aria-label="Edit message"
+                        maxLength={4000}
+                        disabled={saving}
                         onChange={(e) => setEditText(e.target.value)}
                         onKeyDown={(e) => {
+                          if (e.nativeEvent.isComposing) return;
                           if (e.key === "Escape") cancelEdit();
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
@@ -243,10 +281,11 @@ export default function MessageList({
                         }}
                         className="w-full resize-none bg-transparent px-1 text-sm outline-none"
                       />
-                      {editError && <p className="px-1 text-xs text-danger">{editError}</p>}
+                      {editError && <p role="alert" className="px-1 text-xs text-danger">{editError}</p>}
                       <div className="mt-1 flex justify-end gap-2 text-xs">
                         <button
                           onClick={cancelEdit}
+                          disabled={saving}
                           className="rounded-lg px-3 py-1 text-muted hover:bg-cream"
                         >
                           Cancel
@@ -312,8 +351,20 @@ export default function MessageList({
                     </div>
                   )}
 
+                  {!isEditing && <MessageReactions message={m} myId={myId} mine={mine} onReact={onReact} />}
+
+                  {!mine && !showHeader && m.editedAt && !deleted && (
+                    <p className="mt-0.5 text-xs text-muted">
+                      {formatTime(m.createdAt)} {"\u00b7 edited"}
+                    </p>
+                  )}
+
+                  {!mine && group && (
+                    <div className="mt-0.5 text-xs text-muted"><MessageReceipt message={m} receipts={receipts} group onlyRead /></div>
+                  )}
+
                   {mine && !isEditing && (
-                    <p className="mt-0.5 flex items-center justify-end gap-1 text-xs text-muted">
+                    <div className="mt-0.5 flex flex-wrap items-center justify-end gap-1 text-xs text-muted">
                       {formatTime(m.createdAt)}
                       {m.editedAt && !deleted && <span>· edited</span>}
                       {m.status === "pending" && (
@@ -321,7 +372,7 @@ export default function MessageList({
                           <ClockIcon /> Sending...
                         </span>
                       )}
-                      {m.status === "sent" && <TickIcon />}
+                      <MessageReceipt message={m} receipts={receipts} group={group} />
                       {m.status === "failed" && (
                         <span className="text-danger">
                           {" · Failed to send. "}
@@ -334,16 +385,16 @@ export default function MessageList({
                         </span>
                       )}
                       {canAct && (
-                        <span className="ml-2 flex gap-2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                          <button onClick={() => startEdit(m)} className="hover:text-ink">
+                        <span className="ml-2 flex gap-2 opacity-100 transition-opacity sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover:opacity-100">
+                          <button onClick={() => startEdit(m)} disabled={saving || deletingId !== null} className="hover:text-ink disabled:opacity-50">
                             Edit
                           </button>
-                          <button onClick={() => remove(m)} className="hover:text-danger">
-                            Delete
+                          <button onClick={() => remove(m)} disabled={saving || deletingId !== null} className="hover:text-danger disabled:opacity-50">
+                            {deletingId === m._id ? "Deleting..." : "Delete"}
                           </button>
                         </span>
                       )}
-                    </p>
+                    </div>
                   )}
                 </div>
               </div>
