@@ -5,6 +5,9 @@ const readStateSchema = new mongoose.Schema(
         conversationId: { type: mongoose.Schema.Types.ObjectId, ref: "Conversation", required: true },
         userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
         lastReadMessageId: { type: mongoose.Schema.Types.ObjectId, default: null },
+        lastDeliveredMessageId: { type: mongoose.Schema.Types.ObjectId, default: null },
+        // Explicit viewing, independent of unread baselines on group membership.
+        lastReadReceiptMessageId: { type: mongoose.Schema.Types.ObjectId, default: null },
     },
     { timestamps: true }
 );
