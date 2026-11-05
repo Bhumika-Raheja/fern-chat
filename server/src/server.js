@@ -5,7 +5,7 @@ import { connectDB } from "./config/db.js";
 import { initSockets } from "./sockets/index.js";
 
 const server = http.createServer(app);
-initSockets(server);
+app.set("io", initSockets(server));
 
 async function start() {
   try {
