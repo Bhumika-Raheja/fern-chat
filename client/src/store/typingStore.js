@@ -19,6 +19,18 @@ export const useTypingStore = create((set) => ({
         timers[key] = setTimeout(() => useTypingStore.getState().clearTyping(conversationId, userId), 3000);
     },
 
+    forgetConversation: (conversationId) => {
+        Object.keys(timers).filter((key) => key.startsWith(conversationId + ":")).forEach((key) => {
+            clearTimeout(timers[key]);
+            delete timers[key];
+        });
+        set((s) => {
+            const typing = { ...s.typing };
+            delete typing[conversationId];
+            return { typing };
+        });
+    },
+
     clearTyping: (conversationId, userId) => {
         clearTimeout(timers[`${conversationId}:${userId}`]);
         set((s) => {

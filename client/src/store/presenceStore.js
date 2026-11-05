@@ -5,6 +5,13 @@ export const usePresenceStore = create((set) => ({
 
     setList: (ids) => set({ online: Object.fromEntries(ids.map((id) => [id, true])) }),
 
+    mergeSnapshot: (memberIds, onlineIds) => set((s) => {
+        const next = { ...s.online };
+        memberIds.forEach((id) => delete next[id]);
+        onlineIds.forEach((id) => { next[id] = true; });
+        return { online: next };
+    }),
+
     setOne: (id, isOnline) =>
         set((s) => {
             const next = { ...s.online };

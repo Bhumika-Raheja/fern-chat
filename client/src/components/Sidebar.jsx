@@ -1,6 +1,7 @@
 import { useState } from "react";
 import FernLogo from "./FernLogo";
 import Avatar from "./Avatar";
+import NewConversationDialog from "./NewConversationDialog";
 import { useConversationStore } from "../store/conversationStore";
 import { useAuthStore } from "../store/authStore";
 import { usePresenceStore } from "../store/presenceStore";
@@ -69,6 +70,7 @@ export default function Sidebar({ onLogout }) {
   const user = useAuthStore((s) => s.user);
   const online = usePresenceStore((s) => s.online);
   const [query, setQuery] = useState("");
+  const [createType, setCreateType] = useState(null);
 
   function otherPerson(c) {
     return c.memberIds.find((m) => m._id !== user?.id);
@@ -106,6 +108,18 @@ export default function Sidebar({ onLogout }) {
       <div className="mb-4 flex items-center gap-2 px-2">
         <FernLogo size={30} />
         <span className="text-lg font-semibold">Fern</span>
+      </div>
+
+      <div className="mb-4 flex gap-2">
+        <button onClick={() => setCreateType("dm")}
+          className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white hover:opacity-90">
+          New message
+        </button>
+        <button onClick={() => setCreateType("group")} title="Create group or channel"
+          aria-label="Create group or channel"
+          className="rounded-lg border border-line bg-white/60 px-3 py-2 text-lg font-medium hover:bg-white">
+          +
+        </button>
       </div>
 
       <div className="relative mb-4">
@@ -169,6 +183,10 @@ export default function Sidebar({ onLogout }) {
           <LogoutIcon />
         </button>
       </div>
+      {createType && (
+        <NewConversationDialog initialType={createType}
+          onClose={() => setCreateType(null)} onCreated={() => setQuery("")} />
+      )}
     </aside>
   );
 }
