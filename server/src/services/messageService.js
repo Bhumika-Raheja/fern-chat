@@ -92,16 +92,21 @@ export async function editMessage({ messageId, userId, body }) {
 
   if (message.deletedAt) return { error: "This message was deleted" };
 
-  const text = typeof body === "string" ? body.trim() : "";
+  if (typeof body !== "string") return { error: "Message text must be a string" };
+  const text = body.trim();
   if (!text && message.attachments.length === 0) return { error: "Message can't be empty" };
   if (text.length > 4000) return { error: "Message is too long" };
 
-  if (text !== message.body) {
-    message.body = text;
-    message.editedAt = new Date();
-    await message.save();
-  }
-  return { message };
+  if (text === message.body) return { message };
+
+  // Check deletedAt in the write too: a delete may happen after the read above.
+  const updated = await Message.findOneAndUpdate(
+    { _id: message._id, senderId: userId, deletedAt: null },
+    { $set: { body: text, editedAt: new Date() } },
+    { new: true, runValidators: true }
+  );
+  if (!updated) return { error: "This message was deleted" };
+  return { message: updated };
 }
 
 export async function deleteMessage({ messageId, userId }) {
@@ -109,13 +114,16 @@ export async function deleteMessage({ messageId, userId }) {
   if (found.error) return found;
   const { message } = found;
 
-  if (!message.deletedAt) {
-    message.body = "";
-    message.attachments = [];
-    message.deletedAt = new Date();
-    await message.save();
-  }
-  return { message };
+  if (message.deletedAt) return { message };
+
+  const deleted = await Message.findOneAndUpdate(
+    { _id: message._id, senderId: userId, deletedAt: null },
+    { $set: { body: "", attachments: [], reactions: [], deletedAt: new Date() }, $inc: { reactionVersion: 1 } },
+    { new: true, runValidators: true }
+  );
+  // Another tab may already have deleted it. Return the saved tombstone.
+  const current = deleted || await Message.findById(message._id);
+  return current ? { message: current } : { error: "Message not found" };
 }
 
 export async function listMessages({ conversationId, before, after, limit }) {
@@ -124,7 +132,8 @@ export async function listMessages({ conversationId, before, after, limit }) {
     const found = await Message.find({ conversationId, _id: { $gt: after } })
       .sort({ _id: 1 })
       .limit(limit + 1)
-      .populate("senderId", "name avatarUrl");
+      .populate("senderId", "name avatarUrl")
+    .populate("reactions.userId", "name avatarUrl");
 
     const hasMoreNewer = found.length > limit;
     const messages = hasMoreNewer ? found.slice(0, limit) : found;
@@ -141,7 +150,8 @@ export async function listMessages({ conversationId, before, after, limit }) {
   const found = await Message.find(query)
     .sort({ _id: -1 })
     .limit(limit + 1)
-    .populate("senderId", "name avatarUrl");
+    .populate("senderId", "name avatarUrl")
+      .populate("reactions.userId", "name avatarUrl");
 
   const hasMore = found.length > limit;
   const messages = hasMore ? found.slice(0, limit) : found;

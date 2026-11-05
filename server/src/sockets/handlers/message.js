@@ -9,6 +9,7 @@ import {
 // Turn a saved message into plain data, with the sender's name filled in
 async function toData(message) {
   await message.populate("senderId", "name avatarUrl");
+  await message.populate("reactions.userId", "name avatarUrl");
   return JSON.parse(JSON.stringify(message));
 }
 

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { REACTION_EMOJIS } from "../../../shared/reactions.mjs";
 
 const attachmentSchema = new mongoose.Schema(
   {
@@ -12,6 +13,11 @@ const attachmentSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+
+const reactionSchema = new mongoose.Schema({
+  emoji: { type: String, required: true, enum: REACTION_EMOJIS.map((item) => item.emoji) },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+}, { _id: false });
 
 const messageSchema = new mongoose.Schema(
   {
@@ -29,6 +35,8 @@ const messageSchema = new mongoose.Schema(
     body: { type: String, trim: true, maxlength: 4000, default: "" },
     attachments: { type: [attachmentSchema], default: [] },
     clientId: { type: String },
+    reactions: { type: [reactionSchema], default: [] },
+    reactionVersion: { type: Number, default: 0, min: 0 },
     editedAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null },
   },
