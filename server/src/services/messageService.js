@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
+import { DELETE_WINDOW_MS, DELETE_WINDOW_ERROR, isWithinDeleteWindow } from "../../../shared/messagePolicy.mjs";
 
 // Returns the conversation only if this user is a member, otherwise null
 export async function getMemberConversation(conversationId, userId) {
@@ -115,15 +116,26 @@ export async function deleteMessage({ messageId, userId }) {
   const { message } = found;
 
   if (message.deletedAt) return { message };
+  if (!isWithinDeleteWindow(message.createdAt)) return { error: DELETE_WINDOW_ERROR };
 
   const deleted = await Message.findOneAndUpdate(
-    { _id: message._id, senderId: userId, deletedAt: null },
+    {
+      _id: message._id, senderId: userId, deletedAt: null,
+      // Recheck against database time so a delayed write cannot outlive the window.
+      $expr: { $and: [
+        { $gt: ["$createdAt", { $subtract: ["$$NOW", DELETE_WINDOW_MS] }] },
+        { $lte: ["$createdAt", "$$NOW"] },
+      ] },
+    },
     { $set: { body: "", attachments: [], reactions: [], deletedAt: new Date() }, $inc: { reactionVersion: 1 } },
     { new: true, runValidators: true }
   );
   // Another tab may already have deleted it. Return the saved tombstone.
-  const current = deleted || await Message.findById(message._id);
-  return current ? { message: current } : { error: "Message not found" };
+  if (deleted) return { message: deleted };
+  const current = await Message.findById(message._id);
+  if (!current) return { error: "Message not found" };
+  if (current.deletedAt) return { message: current };
+  return { error: DELETE_WINDOW_ERROR };
 }
 
 export async function listMessages({ conversationId, before, after, limit }) {

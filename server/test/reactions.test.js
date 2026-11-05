@@ -16,7 +16,7 @@ afterEach(() => mock.restoreAll());
 
 function fixture({ member = true, deleted = false } = {}) {
   const raw = { _id: messageId, conversationId, senderId: userId, body: "hello",
-    reactions: [], reactionVersion: 0, deletedAt: deleted ? new Date() : null };
+    reactions: [], reactionVersion: 0, createdAt: new Date(), deletedAt: deleted ? new Date() : null };
   mock.method(Conversation, "findOne", async (filter) => {
     assert.equal(String(filter._id), conversationId);
     assert.ok(filter.memberIds);

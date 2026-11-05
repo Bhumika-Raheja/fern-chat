@@ -15,7 +15,7 @@ afterEach(() => mock.restoreAll());
 function fixture(overrides = {}, member = true) {
   const message = {
     _id: messageId, conversationId, senderId: userId,
-    body: "hello", attachments: [], editedAt: null, deletedAt: null,
+    body: "hello", attachments: [], editedAt: null, deletedAt: null, createdAt: new Date(),
     ...overrides,
   };
   mock.method(Message, "findById", async () => ({ ...message }));
@@ -190,5 +190,64 @@ test("malformed socket events without acknowledgements do not throw or broadcast
   const { handlers, events } = socketHarness();
   await handlers["message:edit"]();
   await handlers["message:delete"]();
+  assert.deepEqual(events, []);
+});
+
+test("delete accepts a message just before five minutes and rechecks age in the write", async () => {
+  const now = Date.parse("2026-11-05T10:00:00Z");
+  mock.method(Date, "now", () => now);
+  const message = fixture({ createdAt: new Date(now - 5 * 60 * 1000 + 1) });
+  mock.method(Message, "findOneAndUpdate", async (filter, update) => {
+    assert.deepEqual(filter.$expr, { $and: [
+      { $gt: ["$createdAt", { $subtract: ["$$NOW", 300000] }] },
+      { $lte: ["$createdAt", "$$NOW"] },
+    ] });
+    return savedUpdate(message, update.$set);
+  });
+  assert.ok((await deleteMessage({ messageId, userId })).message.deletedAt);
+});
+
+test("delete rejects messages at or beyond five minutes, even after a recent edit", async () => {
+  const now = Date.parse("2026-11-05T10:00:00Z");
+  mock.method(Date, "now", () => now);
+  for (const age of [300000, 300001, 3600000]) {
+    fixture({ createdAt: new Date(now - age), editedAt: new Date(now), updatedAt: new Date(now) });
+    assert.match((await deleteMessage({ messageId, userId })).error, /5 minutes/);
+  }
+});
+
+test("missing, invalid or future timestamps cannot bypass the delete window", async () => {
+  const now = Date.now();
+  mock.method(Date, "now", () => now);
+  for (const createdAt of [undefined, null, "invalid", new Date(now + 1000)]) {
+    fixture({ createdAt });
+    assert.match((await deleteMessage({ messageId, userId })).error, /5 minutes/);
+  }
+});
+
+test("expiry during the database write returns an error instead of an undeleted message", async () => {
+  fixture();
+  mock.method(Message, "findOneAndUpdate", async () => null);
+  assert.match((await deleteMessage({ messageId, userId })).error, /5 minutes/);
+});
+
+test("retrying an old deleted message still returns its saved tombstone", async () => {
+  const message = fixture({ createdAt: new Date(Date.now() - 3600000), deletedAt: new Date(), body: "" });
+  assert.deepEqual(await deleteMessage({ messageId, userId }), { message });
+});
+
+test("editing remains available after the deletion window", async () => {
+  const message = fixture({ createdAt: new Date(Date.now() - 3600000) });
+  mock.method(Message, "findOneAndUpdate", async (_filter, update) => savedUpdate(message, update.$set));
+  assert.equal((await editMessage({ messageId, userId, body: "edited later" })).message.body, "edited later");
+});
+
+test("expired socket deletion reports the limit and never broadcasts a deletion", async () => {
+  fixture({ createdAt: new Date(Date.now() - 300000) });
+  const { handlers, events } = socketHarness();
+  let response;
+  await handlers["message:delete"]({ messageId }, (res) => { response = res; });
+  assert.equal(response.ok, false);
+  assert.match(response.error, /5 minutes/);
   assert.deepEqual(events, []);
 });

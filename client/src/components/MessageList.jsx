@@ -1,5 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import Avatar from "./Avatar";
+import DeleteMessageButton from "./DeleteMessageButton";
+import { DELETE_WINDOW_ERROR, isWithinDeleteWindow } from "../../../shared/messagePolicy.mjs";
 import MessageReceipt from "./MessageReceipt";
 import MessageReactions from "./MessageReactions";
 import { useVisibleRead } from "../hooks/useVisibleRead";
@@ -134,7 +136,15 @@ export default function MessageList({
 
   async function remove(m) {
     if (actionPending.current) return;
+    if (!isWithinDeleteWindow(m.createdAt)) {
+      window.alert(DELETE_WINDOW_ERROR);
+      return;
+    }
     if (!window.confirm("Delete this message? This can't be undone.")) return;
+    if (!isWithinDeleteWindow(m.createdAt)) {
+      window.alert(DELETE_WINDOW_ERROR);
+      return;
+    }
     actionPending.current = true;
     setDeletingId(m._id);
     try {
@@ -389,9 +399,9 @@ export default function MessageList({
                           <button onClick={() => startEdit(m)} disabled={saving || deletingId !== null} className="hover:text-ink disabled:opacity-50">
                             Edit
                           </button>
-                          <button onClick={() => remove(m)} disabled={saving || deletingId !== null} className="hover:text-danger disabled:opacity-50">
-                            {deletingId === m._id ? "Deleting..." : "Delete"}
-                          </button>
+                          <DeleteMessageButton createdAt={m.createdAt}
+                            onDelete={() => remove(m)} disabled={saving || deletingId !== null}
+                            deleting={deletingId === m._id} />
                         </span>
                       )}
                     </div>
