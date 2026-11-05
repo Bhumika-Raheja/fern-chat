@@ -18,6 +18,7 @@ export default function Login() {
     const [errors, setErrors] = useState({});
     const [alert, setAlert] = useState("");
     const [loading, setLoading] = useState(false);
+    const [googleBusy, setGoogleBusy] = useState(false);
     const [waking, setWaking] = useState(false);
 
     // Already logged in? Go straight to the chat
@@ -25,6 +26,7 @@ export default function Login() {
 
     async function handleSubmit(e) {
         e.preventDefault();
+        if (loading || googleBusy) return;
         setAlert("");
 
         const next = {};
@@ -94,7 +96,7 @@ export default function Login() {
 
                 <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || googleBusy}
                     className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-medium text-white disabled:opacity-60"
                 >
                     {loading && (
@@ -112,8 +114,8 @@ export default function Login() {
 
             <GoogleButton
                 label="Continue with Google"
-                disabled={loading}
-                onClick={() => setAlert("Google sign-in is coming soon.")}
+                disabled={loading || googleBusy}
+                onBusyChange={setGoogleBusy}
             />
 
             <p className="mt-6 text-center text-sm text-muted">

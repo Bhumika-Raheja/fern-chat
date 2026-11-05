@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema(
             lowercase: true,
             trim: true,
         },
+        googleId: { type: String, unique: true, sparse: true, select: false },
         passwordHash: { type: String, select: false },
         avatarUrl: { type: String, default: "" },
         statusMessage: { type: String, default: "", maxlength: 100 },

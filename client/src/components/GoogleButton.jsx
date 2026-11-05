@@ -1,18 +1,136 @@
-export default function GoogleButton({ label, onClick, disabled }) {
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "../api/client";
+import { useAuthStore } from "../store/authStore";
+
+let scriptPromise;
+function loadGoogle() {
+    if (window.google?.accounts?.id) return Promise.resolve(window.google);
+    if (!scriptPromise) {
+        scriptPromise = new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = "https://accounts.google.com/gsi/client";
+            script.async = true;
+            script.onload = () => resolve(window.google);
+            script.onerror = () => {
+                script.remove();
+                scriptPromise = undefined;
+                reject(new Error("Could not load Google sign-in. Check your connection and reload."));
+            };
+            document.head.appendChild(script);
+        });
+    }
+    return scriptPromise;
+}
+
+export default function GoogleButton({ label, disabled, onBusyChange }) {
+    const container = useRef(null);
+    const active = useRef(false);
+    const busy = useRef(false);
+    const disabledRef = useRef(disabled);
+    const busyCallback = useRef(onBusyChange);
+    const [error, setError] = useState("");
+    const [pending, setPending] = useState(false);
+    const [credential, setCredential] = useState(null);
+    const [password, setPassword] = useState("");
+    const navigate = useNavigate();
+    const setSession = useAuthStore((s) => s.setSession);
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+    useEffect(() => { disabledRef.current = disabled; }, [disabled]);
+    useEffect(() => { busyCallback.current = onBusyChange; }, [onBusyChange]);
+
+    useEffect(() => {
+        active.current = true;
+        let cancelled = false;
+        if (clientId) {
+            loadGoogle().then((google) => {
+                if (cancelled) return;
+                google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: ({ credential: token }) => {
+                        if (!disabledRef.current && !busy.current) void authenticate(token);
+                    },
+                    auto_select: false,
+                });
+                google.accounts.id.renderButton(container.current, {
+                    type: "standard", theme: "outline", size: "large",
+                    text: label?.startsWith("Sign up") ? "signup_with" : "continue_with",
+                    width: Math.min(container.current.clientWidth || 320, 400),
+                });
+            }).catch((err) => { if (!cancelled) setError(err.message); });
+        }
+        return () => { cancelled = true; active.current = false; };
+
+        async function authenticate(token, linkPassword) {
+            if (busy.current) return;
+            busy.current = true;
+            setPending(true);
+            busyCallback.current?.(true);
+            setError("");
+            try {
+                const { data } = await api.post("/api/auth/google", {
+                    credential: token, ...(linkPassword ? { password: linkPassword } : {}),
+                });
+                if (!active.current) return;
+                setSession(data.token, data.user);
+                navigate("/chat", { replace: true });
+            } catch (err) {
+                if (!active.current) return;
+                if (err.response?.data?.code === "PASSWORD_REQUIRED") setCredential(token);
+                setError(err.response?.data?.message || "Could not reach the server. Please try again.");
+            } finally {
+                busy.current = false;
+                if (active.current) {
+                    setPending(false);
+                    busyCallback.current?.(false);
+                }
+            }
+        }
+    }, [clientId, label, navigate, setSession]);
+
+    async function linkAccount(event) {
+        event.preventDefault();
+        if (busy.current || !password) return;
+        busy.current = true;
+        setPending(true);
+        onBusyChange?.(true);
+        setError("");
+        try {
+            const { data } = await api.post("/api/auth/google", { credential, password });
+            if (!active.current) return;
+            setSession(data.token, data.user);
+            navigate("/chat", { replace: true });
+        } catch (err) {
+            if (active.current) setError(err.response?.data?.message || "Could not link your account. Please try again.");
+        } finally {
+            busy.current = false;
+            if (active.current) { setPending(false); onBusyChange?.(false); }
+        }
+    }
+
+    if (!clientId) return <p className="text-center text-sm text-muted">Google sign-in is not available yet.</p>;
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            disabled={disabled}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-white py-2.5 text-sm font-medium text-ink hover:bg-cream disabled:opacity-50"
-        >
-            <svg width="18" height="18" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z" />
-                <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1C3.3 21.4 7.3 24 12 24z" />
-                <path fill="#FBBC05" d="M5.3 14.3c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3V6.6H1.3C.5 8.2 0 10 0 12s.5 3.8 1.3 5.4l4-3.1z" />
-                <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4C18 1.2 15.2 0 12 0 7.300 0 3.3 2.7 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z" />
-            </svg>
-            {label}
-        </button>
+        <div>
+            <div ref={container} inert={disabled || pending || !!credential}
+                className={`flex justify-center ${disabled || pending || credential ? "opacity-50" : ""}`} />
+            {pending && <p role="status" className="mt-2 text-sm text-muted">Connecting to Google...</p>}
+            {error && <p role="alert" className="mt-2 text-sm text-danger">{error}</p>}
+            {credential && (
+                <form onSubmit={linkAccount} className="mt-3">
+                    <label className="block text-sm">
+                        Fern password
+                        <input type="password" autoComplete="current-password" required
+                            value={password} onChange={(e) => setPassword(e.target.value)}
+                            className="mt-1 block w-full rounded-lg border border-line p-2" />
+                    </label>
+                    <button disabled={pending || !password} className="mt-2 rounded-lg bg-primary px-3 py-2 text-sm text-white disabled:opacity-50">
+                        Link account and sign in
+                    </button>
+                    <button type="button" disabled={pending} onClick={() => { setCredential(null); setPassword(""); setError(""); }}
+                        className="ml-3 text-sm text-muted">Cancel</button>
+                </form>
+            )}
+        </div>
     );
 }

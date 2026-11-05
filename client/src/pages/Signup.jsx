@@ -38,6 +38,7 @@ export default function Signup() {
     const [errors, setErrors] = useState({});
     const [alert, setAlert] = useState("");
     const [loading, setLoading] = useState(false);
+    const [googleBusy, setGoogleBusy] = useState(false);
     const [waking, setWaking] = useState(false);
 
     if (token) return <Navigate to="/chat" replace />;
@@ -46,6 +47,7 @@ export default function Signup() {
 
     async function handleSubmit(e) {
         e.preventDefault();
+        if (loading || googleBusy) return;
         setAlert("");
 
         const next = {};
@@ -96,8 +98,8 @@ export default function Signup() {
 
             <GoogleButton
                 label="Sign up with Google"
-                disabled={loading}
-                onClick={() => setAlert("Google sign-up is coming soon.")}
+                disabled={loading || googleBusy}
+                onBusyChange={setGoogleBusy}
             />
 
             <div className="my-5 flex items-center gap-3 text-xs text-muted">
@@ -173,7 +175,7 @@ export default function Signup() {
 
                 <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || googleBusy}
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-medium text-white disabled:opacity-60"
                 >
                     {loading && (
