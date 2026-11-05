@@ -1,61 +1,103 @@
 import mongoose from "mongoose";
 import Conversation from "../models/Conversation.js";
+import User from "../models/User.js";
+import { connectConversationMembers } from "../sockets/conversations.js";
 import Message from "../models/Message.js";
 import ReadState from "../models/ReadState.js";
-import { getMemberConversation } from "../services/messageService.js";
 
 export async function createConversation(req, res, next) {
-    try {
-        const { type, name, description, memberIds } = req.body || {};
-        const me = req.user._id;
+    const { type, name, description, memberIds } = req.body || {};
+    const me = req.user._id;
+    let dmPair;
 
+    async function respond(conversation, created) {
+        await conversation.populate("memberIds", "name avatarUrl");
+        if (created) {
+            // New members start with an empty read pointer, even while offline.
+            await ReadState.bulkWrite(conversation.memberIds.map((member) => ({
+                updateOne: {
+                    filter: { conversationId: conversation._id, userId: member._id },
+                    update: { $setOnInsert: { lastReadMessageId: null } },
+                    upsert: true,
+                },
+            })));
+        }
+        const data = conversation.toObject();
+        await connectConversationMembers(req.app.get("io"), data, created);
+        return res.status(created ? 201 : 200).json({ conversation: data });
+    }
+
+    try {
         if (!["dm", "group", "channel"].includes(type)) {
             return res.status(400).json({ message: "Type must be dm, group or channel" });
         }
+        if (!Array.isArray(memberIds) || memberIds.length > 99 ||
+            memberIds.some((id) => typeof id !== "string" || !mongoose.isValidObjectId(id))) {
+            return res.status(400).json({ message: "Choose up to 99 valid members" });
+        }
+        const others = [...new Set(memberIds.map((id) => new mongoose.Types.ObjectId(id).toHexString()))]
+            .filter((id) => id !== String(me));
+        if (type === "dm") dmPair = [me, others[0]];
+        if (type === "dm" && others.length !== 1) {
+            return res.status(400).json({ message: "A direct message needs exactly one other person" });
+        }
+        if (type !== "dm" && others.length === 0) {
+            return res.status(400).json({ message: "Choose at least one other member" });
+        }
 
-        // Clean the member list: valid ids only, no duplicates, no myself
-        const others = [...new Set((memberIds || []).map(String))].filter(
-            (id) => mongoose.isValidObjectId(id) && id !== String(me)
-        );
-
-        // Direct message: exactly one other person
-        if (type === "dm") {
-            if (others.length !== 1) {
-                return res.status(400).json({ message: "A direct message needs exactly one other person" });
+        let cleanName = "";
+        if (type !== "dm") {
+            if (typeof name !== "string" || !name.trim()) {
+                return res.status(400).json({ message: "Name is required" });
             }
+            cleanName = type === "channel"
+                ? name.trim().toLowerCase().replace(/\s+/g, "-")
+                : name.trim();
+            if (cleanName.length > 40) {
+                return res.status(400).json({ message: "Name must be 40 characters or fewer" });
+            }
+        }
+        if (description !== undefined &&
+            (typeof description !== "string" || description.trim().length > 200)) {
+            return res.status(400).json({ message: "Description must be 200 characters or fewer" });
+        }
+
+        const memberCount = await User.countDocuments({ _id: { $in: others } });
+        if (memberCount !== others.length) {
+            return res.status(400).json({ message: "One or more selected users no longer exist" });
+        }
+
+        if (type === "dm") {
             const existing = await Conversation.findOne({
                 type: "dm",
-                memberIds: { $all: [me, others[0]], $size: 2 },
+                memberIds: { $all: dmPair, $size: 2 },
             });
-            if (existing) {
-                return res.json({ conversation: existing });
-            }
-            const dm = await Conversation.create({
-                type: "dm",
-                memberIds: [me, others[0]],
-                createdBy: me,
-            });
-            return res.status(201).json({ conversation: dm });
+            if (existing) return await respond(existing, false);
         }
-
-        // Channel or group: needs a name
-        if (!name || !name.trim()) {
-            return res.status(400).json({ message: "Name is required" });
-        }
-        const cleanName =
-            type === "channel" ? name.trim().toLowerCase().replace(/\s+/g, "-") : name.trim();
 
         const conversation = await Conversation.create({
             type,
             name: cleanName,
-            description,
+            description: typeof description === "string" ? description.trim() : "",
             memberIds: [me, ...others],
-            adminIds: [me],
+            adminIds: type === "dm" ? [] : [me],
             createdBy: me,
+            ...(type === "dm" ? { dmKey: [String(me), others[0]].sort().join(":") } : {}),
         });
-
-        res.status(201).json({ conversation });
+        return await respond(conversation, true);
     } catch (err) {
+        if (err.code === 11000 && type === "dm") {
+            // The other participant may have started the same DM concurrently.
+            try {
+                const existing = await Conversation.findOne({
+                    type: "dm",
+                    memberIds: { $all: dmPair, $size: 2 },
+                });
+                if (existing) return await respond(existing, false);
+            } catch (lookupError) {
+                return next(lookupError);
+            }
+        }
         if (err.code === 11000) {
             return res.status(409).json({ message: "A channel with this name already exists" });
         }
@@ -108,33 +150,6 @@ export async function listConversations(req, res, next) {
         );
 
         res.json({ conversations: result });
-    } catch (err) {
-        next(err);
-    }
-}
-
-// "I have read everything in this conversation up to now"
-export async function markRead(req, res, next) {
-    try {
-        const conversation = await getMemberConversation(req.params.id, req.user._id);
-        if (!conversation) {
-            return res.status(404).json({ message: "Conversation not found" });
-        }
-
-        const newest = await Message.findOne({ conversationId: conversation._id })
-            .sort({ _id: -1 })
-            .select("_id");
-
-        if (newest) {
-            // $max means the pointer can only move forward, never back
-            await ReadState.updateOne(
-                { conversationId: conversation._id, userId: req.user._id },
-                { $max: { lastReadMessageId: newest._id } },
-                { upsert: true }
-            );
-        }
-
-        res.json({ ok: true });
     } catch (err) {
         next(err);
     }
