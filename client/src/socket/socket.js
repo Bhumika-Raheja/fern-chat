@@ -22,12 +22,10 @@ export function connectSocket(token) {
     }
 
     socket.on("connect", () => {
-        console.log("Socket connected", socket.id);
         setStatus("connected");
     });
 
     socket.on("disconnect", (reason) => {
-        console.log("Socket disconnected:", reason);
         if (reason === "io client disconnect") return; // I left on purpose
         setStatus("reconnecting");
         // If the server closed the line itself, the browser does not retry by default
@@ -35,7 +33,6 @@ export function connectSocket(token) {
     });
 
     socket.on("connect_error", (err) => {
-        console.log("Socket error:", err.message);
         setStatus("reconnecting");
     });
 

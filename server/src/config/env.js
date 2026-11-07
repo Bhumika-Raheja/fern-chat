@@ -1,5 +1,13 @@
 import "dotenv/config";
 
+// In production, refuse to start with a missing or default secret
+if (
+  process.env.NODE_ENV === "production" &&
+  (!process.env.JWT_SECRET || process.env.JWT_SECRET === "dev-secret")
+) {
+  throw new Error("JWT_SECRET must be set to a long random value in production");
+}
+
 export const env = {
   NODE_ENV: process.env.NODE_ENV || "development",
   PORT: Number(process.env.PORT) || 5000,

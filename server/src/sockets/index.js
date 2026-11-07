@@ -52,9 +52,7 @@ export function initSockets(httpServer) {
         });
 
         socket.on("disconnect", (reason) => {
-            console.log(`Socket disconnected: ${socket.user.name} (${reason})`);
             userDisconnected(userId, () => {
-                console.log(`[presence] ${socket.user.name} is now offline`);
                 User.updateOne({ _id: userId }, { lastSeenAt: new Date() }).catch(() => { });
                 if (rooms.length) io.to(rooms).emit("presence:update", { userId, online: false });
             });
@@ -94,7 +92,6 @@ export function initSockets(httpServer) {
             io.to(rooms).emit("presence:update", { userId, online: true });
         }
 
-        console.log(`Socket connected: ${socket.user.name} (${conversations.length} rooms)`);
     });
 
     return io;

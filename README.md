@@ -2,7 +2,7 @@
 
 Real-time chat and team collaboration app.
 
-**Stack:** React (Vite), Zustand, Tailwind, Socket.io, Node, Express, MongoDB, Redis.
+**Stack:** React (Vite), Zustand, Tailwind, Socket.io, Node, Express, MongoDB Atlas, Cloudinary, Google Sign-In.
 ## Google sign-in and sign-up
 
 Both auth pages use Google Identity Services. New Google users get an account;
