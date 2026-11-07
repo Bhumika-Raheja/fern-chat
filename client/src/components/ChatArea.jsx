@@ -77,7 +77,7 @@ export default function ChatArea({ conversation }) {
         {conversation.type !== "dm" && (
           <span className="flex items-center gap-1.5 text-sm text-muted">
             {isPublic ? <GlobeIcon /> : <LockIcon />}
-            {isPublic ? "Public" : "Private"}
+            {isPublic ? "Channel" : "Private"}
           </span>
         )}
 

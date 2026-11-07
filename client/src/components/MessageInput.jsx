@@ -129,7 +129,8 @@ export default function MessageInput({ placeholder, conversationId, onSend }) {
     lastSent.current = 0;
   }
 
-  function handleKeyDown(e) {
+    function handleKeyDown(e) {
+    if (e.nativeEvent.isComposing) return; // Enter confirms a suggestion, not a send
     // Enter sends, Shift+Enter makes a new line
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();

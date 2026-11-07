@@ -26,6 +26,7 @@ export default function EmojiPickerDialog({ onClose, onSelect, selected, pending
       onCancel={(event) => { event.preventDefault(); close(); }}
       onClick={(event) => { if (event.target === event.currentTarget) close(); }}
       className="m-auto w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-line bg-cream p-5 text-ink shadow-xl backdrop:bg-black/40">
+      <div className="p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 id="emoji-picker-title" className="text-lg font-semibold">React to message</h2>
         <button type="button" aria-label="Close emoji picker" onClick={close} disabled={!!pending}
@@ -61,6 +62,7 @@ export default function EmojiPickerDialog({ onClose, onSelect, selected, pending
       {choices.length === 0 && <p className="py-5 text-center text-sm text-muted">No matching emoji. Try another search or category.</p>}
       {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
       <p className="mt-3 text-xs text-muted">Choose an emoji to react. Select your reaction again to remove it.</p>
+      </div>
     </dialog>
   );
 }

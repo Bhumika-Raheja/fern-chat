@@ -74,7 +74,8 @@ export default function MembersDialog({ conversation, onClose }) {
     <dialog ref={dialogRef} aria-labelledby="members-title"
       onCancel={(event) => { event.preventDefault(); close(); }}
       onClick={(event) => { if (event.target === event.currentTarget) close(); }}
-      className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-2xl border border-line bg-cream p-6 text-ink shadow-xl backdrop:bg-black/40">
+      className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto rounded-2xl border border-line bg-cream p-0 text-ink shadow-xl backdrop:bg-black/40">
+        <div className="p-6">
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 id="members-title" className="text-xl font-semibold">Members</h2>
@@ -161,6 +162,7 @@ export default function MembersDialog({ conversation, onClose }) {
           className="rounded-lg border border-danger px-3 py-2 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-40">
           {pending === "leave" ? "Leaving..." : "Leave conversation"}
         </button>
+      </div>
       </div>
     </dialog>
   );

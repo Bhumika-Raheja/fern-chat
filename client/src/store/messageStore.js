@@ -108,6 +108,14 @@ async function syncOne(get, conversationId) {
       if (!after || !res.data.hasMoreNewer || list.length === 0) break;
       after = list[list.length - 1]._id;
     }
+
+    // Also refresh the newest messages, so edits and deletes made while offline show up.
+    // updateMessage only touches messages we already have, so the order can't break.
+    const latest = await api.get(`/api/conversations/${conversationId}/messages`, {
+      params: { limit: 100 },
+    });
+    if (started !== epoch(conversationId)) return;
+    latest.data.messages.forEach((m) => get().updateMessage(m));
   } catch {
     // ignore: the next reconnect will try again
   }
