@@ -10,5 +10,5 @@ export default function TypingIndicator({ conversationId }) {
     else if (names.length > 2) text = "Several people are typing...";
 
     // Always take up one line, so the layout doesn't jump
-    return <div className="h-5 px-6 text-xs text-muted">{text}</div>;
+    return <div aria-live="polite" className="h-5 px-6 text-xs text-muted">{text}</div>;
 }

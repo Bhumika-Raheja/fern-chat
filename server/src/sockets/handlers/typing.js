@@ -4,6 +4,7 @@ export function registerTypingHandlers(io, socket) {
     socket.on("typing", async (payload) => {
         try {
             const conversationId = payload?.conversationId;
+            if (!conversationId || !socket.user?._id) return;
 
             const conversation = await getMemberConversation(conversationId, socket.user._id);
             if (!conversation) return;
@@ -12,7 +13,7 @@ export function registerTypingHandlers(io, socket) {
             socket.to(`conversation:${conversation._id}`).emit("typing", {
                 conversationId: String(conversation._id),
                 userId: String(socket.user._id),
-                name: socket.user.name,
+                name: socket.user.name || "Someone",
             });
         } catch (err) {
             console.error(err);

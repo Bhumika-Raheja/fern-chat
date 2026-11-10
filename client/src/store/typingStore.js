@@ -6,25 +6,30 @@ export const useTypingStore = create((set) => ({
     typing: {}, // { conversationId: { userId: name } }
 
     setTyping: (conversationId, userId, name) => {
+        if (!conversationId || !userId) return;
+        const convKey = String(conversationId);
+        const userKey = String(userId);
         set((s) => ({
             typing: {
                 ...s.typing,
-                [conversationId]: { ...(s.typing[conversationId] || {}), [userId]: name },
+                [convKey]: { ...(s.typing[convKey] || {}), [userKey]: name },
             },
         }));
 
         // Hide it after 3 seconds unless a new signal arrives
-        const key = `${conversationId}:${userId}`;
+        const key = `${convKey}:${userKey}`;
         clearTimeout(timers[key]);
-        timers[key] = setTimeout(() => useTypingStore.getState().clearTyping(conversationId, userId), 3000);
+        timers[key] = setTimeout(() => useTypingStore.getState().clearTyping(convKey, userKey), 3000);
     },
 
     forgetConversation: (conversationId) => {
-        Object.keys(timers).filter((key) => key.startsWith(conversationId + ":")).forEach((key) => {
+        const prefix = String(conversationId) + ":";
+        Object.keys(timers).filter((key) => key.startsWith(prefix)).forEach((key) => {
             clearTimeout(timers[key]);
             delete timers[key];
         });
         set((s) => {
+            if (!s.typing[conversationId]) return s;
             const typing = { ...s.typing };
             delete typing[conversationId];
             return { typing };
@@ -32,11 +37,21 @@ export const useTypingStore = create((set) => ({
     },
 
     clearTyping: (conversationId, userId) => {
-        clearTimeout(timers[`${conversationId}:${userId}`]);
+        if (!conversationId || !userId) return;
+        const convKey = String(conversationId);
+        const userKey = String(userId);
+        const key = `${convKey}:${userKey}`;
+        clearTimeout(timers[key]);
+        delete timers[key];
         set((s) => {
-            const room = { ...(s.typing[conversationId] || {}) };
-            delete room[userId];
-            return { typing: { ...s.typing, [conversationId]: room } };
+            const existing = s.typing[convKey];
+            if (!existing || !(userKey in existing)) return s;
+            const room = { ...existing };
+            delete room[userKey];
+            const typing = { ...s.typing };
+            if (Object.keys(room).length === 0) delete typing[convKey];
+            else typing[convKey] = room;
+            return { typing };
         });
     },
 }));
