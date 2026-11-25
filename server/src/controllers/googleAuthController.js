@@ -23,10 +23,9 @@ export async function googleAuth(req, res, next) {
         if (!profile?.sub || !profile.email || profile.email_verified !== true) {
             throw new Error("Unverified identity");
         }
-        } catch (err) {
-            console.error("Google verify failed:", err.message);
-            return res.status(401).json({ message: "Google sign-in could not be verified. Please try again." });
-        }try {
+        } catch {
+        return res.status(401).json({ message: "Google sign-in could not be verified. Please try again." });
+    } try {
         const email = profile.email.trim().toLowerCase();
         let user = await User.findOne({ googleId: profile.sub }).select("+googleId");
         let created = false;
