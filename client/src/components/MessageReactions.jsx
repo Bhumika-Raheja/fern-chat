@@ -2,13 +2,27 @@ import { useRef, useState } from "react";
 import { groupReactions } from "../../../shared/reactions.mjs";
 import EmojiPickerDialog from "./EmojiPickerDialog";
 
-export default function MessageReactions({ message, myId, mine, onReact }) {
+export default function MessageReactions({ message, myId, mine, onReact, readOnly = false }) {
   const [picker, setPicker] = useState(false);
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
   const busyRef = useRef(false);
   if (message.deletedAt || message.status !== "sent") return null;
   const groups = groupReactions(message.reactions, myId);
+    if (readOnly) {
+    if (groups.length === 0) return null;
+    return (
+      <div className={"mt-1 flex flex-wrap gap-1 " + (mine ? "justify-end" : "")}>
+        {groups.map((group) => (
+          <span key={group.emoji} title={group.users.map((u) => u.name).join(", ")}
+            className="inline-flex items-center gap-1 rounded-full border border-line bg-white/70 px-2 py-0.5 text-xs">
+            <span className="text-base">{group.emoji}</span>
+            <span>{group.users.length}</span>
+          </span>
+        ))}
+      </div>
+    );
+  }
 
   async function react(emoji, active) {
     if (busyRef.current) return false;

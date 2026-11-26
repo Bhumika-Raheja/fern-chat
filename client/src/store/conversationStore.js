@@ -27,6 +27,7 @@ async function membershipRequest(get, method, id, suffix, payload) {
 export const useConversationStore = create((set, get) => ({
   conversations: [],
   activeId: null,
+  preview: null, // a public channel I am reading but have not joined
   loading: false,
   error: "",
   notice: "",
@@ -99,6 +100,19 @@ export const useConversationStore = create((set, get) => ({
     return conversation;
   },
 
+  // Read a public channel without joining it
+  openPreview: (channel) => set({ preview: channel, activeId: null, notice: "" }),
+  closePreview: () => set({ preview: null }),
+
+  // Become a member of a public channel, then open it
+  joinChannel: async (id) => {
+    const res = await api.post("/api/channels/" + id + "/join");
+    const conversation = res.data.conversation;
+    get().upsertConversation(conversation);
+    get().setActive(conversation._id);
+    return conversation;
+  },
+
   addMembers: (id, memberIds) => membershipRequest(get, "post", id, "/members", { memberIds }),
   removeMember: (id, userId) => membershipRequest(get, "delete", id, "/members/" + userId),
   changeMemberRole: (id, userId, role) =>
@@ -107,7 +121,7 @@ export const useConversationStore = create((set, get) => ({
 
   setActive: (id) => {
     if (!get().conversations.some((c) => c._id === id)) return;
-    set({ activeId: id, notice: "" });
+    set({ activeId: id, preview: null, notice: "" });
   },
 
   setUnread: (id, unreadCount) => set((s) => ({
@@ -122,6 +136,6 @@ export const useConversationStore = create((set, get) => ({
   reset: () => {
     fetchVersion++;
     removedVersions.clear();
-    set({ conversations: [], activeId: null, loading: false, error: "", notice: "" });
+    set({ conversations: [], activeId: null, preview: null, loading: false, error: "", notice: "" });
   },
 }));

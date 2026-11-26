@@ -31,17 +31,17 @@ export async function createConversation(req, res, next) {
         if (!["dm", "group", "channel"].includes(type)) {
             return res.status(400).json({ message: "Type must be dm, group or channel" });
         }
-        if (!Array.isArray(memberIds) || memberIds.length > 99 ||
-            memberIds.some((id) => typeof id !== "string" || !mongoose.isValidObjectId(id))) {
+        const requested = memberIds === undefined && type === "channel" ? [] : memberIds;
+        if (!Array.isArray(requested) || requested.length > 99 || requested.some((id) => typeof id !== "string" || !mongoose.isValidObjectId(id))) {
             return res.status(400).json({ message: "Choose up to 99 valid members" });
         }
-        const others = [...new Set(memberIds.map((id) => new mongoose.Types.ObjectId(id).toHexString()))]
+        const others = [...new Set(requested.map((id) => new mongoose.Types.ObjectId(id).toHexString()))]
             .filter((id) => id !== String(me));
         if (type === "dm") dmPair = [me, others[0]];
         if (type === "dm" && others.length !== 1) {
             return res.status(400).json({ message: "A direct message needs exactly one other person" });
         }
-        if (type !== "dm" && others.length === 0) {
+        if (type === "group" && others.length === 0) {
             return res.status(400).json({ message: "Choose at least one other member" });
         }
 

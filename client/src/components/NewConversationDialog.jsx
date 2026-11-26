@@ -60,7 +60,7 @@ export default function NewConversationDialog({ initialType = "dm", onClose, onC
   const searching = search.length >= 2 && result.query !== search;
   const users = result.query === search && search.length >= 2 ? result.users : [];
   const searchError = result.query === search ? result.error : "";
-  const valid = selected.length > 0 && (type === "dm" || name.trim().length > 0);
+  const valid = type === "dm" ? selected.length === 1 : type === "channel" ? name.trim().length > 0 : selected.length > 0 && name.trim().length > 0;
 
   function changeType(value) {
     setType(value);
@@ -153,13 +153,13 @@ export default function NewConversationDialog({ initialType = "dm", onClose, onC
                   className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-2 font-normal outline-none focus:border-primary" />
               </label>
               {type === "channel" && (
-                <p className="text-xs text-muted">Spaces in the channel name become hyphens. Selected members will be added.</p>
+                  <p className="text-xs text-muted">Channels are public: anyone on Fern can find, read and join this channel. Spaces in the name become hyphens. Members you select are added right away.</p>
               )}
             </div>
           )}
 
           <label className="block text-sm font-medium" htmlFor="conversation-user-search">
-            {type === "dm" ? "Find a person" : "Add members"}
+            {type === "dm" ? "Find a person" : type === "channel" ? "Add members (optional)" : "Add members"}
           </label>
           <input id="conversation-user-search" autoFocus value={query} maxLength={80}
             onChange={(event) => setQuery(event.target.value)} autoComplete="off"

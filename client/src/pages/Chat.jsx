@@ -10,6 +10,7 @@ import { useReceiptStore } from "../store/receiptStore";
 import { connectSocket, disconnectSocket } from "../socket/socket";
 import Sidebar from "../components/Sidebar";
 import ChatArea from "../components/ChatArea";
+import ChannelPreview from "../components/ChannelPreview";
 import ConnectionBanner from "../components/ConnectionBanner";
 
 // Runs every time the socket connects (the first time and after each reconnect)
@@ -73,7 +74,7 @@ function onUpdatedMessage(m) {
 export default function Chat() {
   const navigate = useNavigate();
   const { token, setSession, logout } = useAuthStore();
-  const { conversations, activeId, fetchConversations, notice, dismissNotice } = useConversationStore();
+  const { conversations, activeId, preview, fetchConversations, notice, dismissNotice } = useConversationStore();
 
   useEffect(() => {
     if (!token) {
@@ -198,8 +199,10 @@ export default function Chat() {
           </div>
         )}
         <div className="flex min-h-0 flex-1">
-          {active ? (
+        {active ? (
             <ChatArea key={active._id} conversation={active} />
+          ) : preview ? (
+            <ChannelPreview key={preview._id} channel={preview} />
           ) : (
             <div className="flex flex-1 items-center justify-center">
               <p className="text-muted">Select a conversation</p>

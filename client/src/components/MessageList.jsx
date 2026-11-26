@@ -73,6 +73,7 @@ export default function MessageList({
   onRead,
   receipts,
   group = false,
+  readOnly = false,
 }) {
   const boxRef = useRef(null);
   useVisibleRead(boxRef, messages, onRead);
@@ -228,7 +229,7 @@ export default function MessageList({
           const name = m.senderId?.name || "Unknown";
           const deleted = !!m.deletedAt;
           const isEditing = editingId === m._id && !deleted;
-          const canAct = mine && m.status === "sent" && !deleted;
+          const canAct = !readOnly && mine && m.status === "sent" && !deleted;
 
           const newDay = !before || new Date(before.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
           const sameSender = before && before.senderId?._id === m.senderId?._id;
@@ -361,7 +362,7 @@ export default function MessageList({
                     </div>
                   )}
 
-                  {!isEditing && <MessageReactions message={m} myId={myId} mine={mine} onReact={onReact} />}
+                  {!isEditing && <MessageReactions message={m} myId={myId} mine={mine} onReact={onReact} readOnly={readOnly} />}
 
                   {!mine && !showHeader && m.editedAt && !deleted && (
                     <p className="mt-0.5 text-xs text-muted">

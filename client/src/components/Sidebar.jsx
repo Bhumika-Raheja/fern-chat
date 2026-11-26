@@ -2,6 +2,7 @@ import { useState } from "react";
 import FernLogo from "./FernLogo";
 import Avatar from "./Avatar";
 import NewConversationDialog from "./NewConversationDialog";
+import ChannelBrowser from "./ChannelBrowser";
 import { useConversationStore } from "../store/conversationStore";
 import { useAuthStore } from "../store/authStore";
 import { usePresenceStore } from "../store/presenceStore";
@@ -71,6 +72,7 @@ export default function Sidebar({ onLogout }) {
   const online = usePresenceStore((s) => s.online);
   const [query, setQuery] = useState("");
   const [createType, setCreateType] = useState(null);
+    const [browsing, setBrowsing] = useState(false);
 
   function otherPerson(c) {
     return c.memberIds.find((m) => m._id !== user?.id);
@@ -121,6 +123,10 @@ export default function Sidebar({ onLogout }) {
           +
         </button>
       </div>
+      <button onClick={() => setBrowsing(true)}
+        className="mb-4 w-full rounded-lg border border-line bg-white/60 px-3 py-2 text-sm font-medium hover:bg-white">
+        Browse channels
+      </button>
 
       <div className="relative mb-4">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">
@@ -187,6 +193,7 @@ export default function Sidebar({ onLogout }) {
         <NewConversationDialog initialType={createType}
           onClose={() => setCreateType(null)} onCreated={() => setQuery("")} />
       )}
+      {browsing && <ChannelBrowser onClose={() => setBrowsing(false)} />}
     </aside>
   );
 }

@@ -82,3 +82,35 @@ export async function changeMembership({ conversationId, actorId, action, member
   }
   fail(409, "Members changed at the same time. Please try again.");
 }
+
+// Anyone logged in can join a public channel themselves.
+export async function joinChannel({ conversationId, userId }) {
+  if (!mongoose.isValidObjectId(conversationId)) fail(400, "Invalid channel ID");
+  const me = String(userId);
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const channel = await Conversation.findOne({ _id: conversationId, type: "channel" });
+    if (!channel) fail(404, "Channel not found");
+
+    const members = channel.memberIds.map(String);
+    if (members.includes(me)) {
+      return { conversation: channel, addedMemberIds: [], removedMemberIds: [], changed: false };
+    }
+    if (members.length >= 100) fail(409, "This channel is full (100 members).");
+
+    const updated = await Conversation.findOneAndUpdate(
+      {
+        _id: channel._id,
+        type: "channel",
+        memberIds: { $ne: userId },
+        __v: channel.__v === undefined ? { $exists: false } : channel.__v,
+      },
+      { $addToSet: { memberIds: userId }, $inc: { __v: 1 } },
+      { returnDocument: "after", runValidators: true }
+    );
+    if (updated) {
+      return { conversation: updated, addedMemberIds: [me], removedMemberIds: [], changed: true };
+    }
+  }
+  fail(409, "The channel changed at the same time. Please try again.");
+}
